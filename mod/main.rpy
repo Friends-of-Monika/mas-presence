@@ -20,22 +20,6 @@ init -99 python in fom_presence:
         global _client
         _client = None
 
-    def _create_activity(conf):
-        return Activity(
-            state=conf.state.get(),
-            details=conf.details.get(),
-            timestamps=Timestamps(
-                start=conf.start_ts.get(),
-                end=conf.stop_ts.get()
-            ),
-            assets=Assets(
-                large_image=conf.large_image,
-                large_text=conf.large_text.get(),
-                small_image=conf.small_image,
-                small_text=conf.small_text.get()
-            )
-        )
-
     def _update_presence():
         # Load .ini files and evaluate their conditions and priorities to
         # determine one that will be chosen for this presence update.
@@ -68,7 +52,7 @@ init -99 python in fom_presence:
             _connect_client(conf)
 
         # Set activity from this presence config.
-        _client.set_activity(_create_activity(conf))
+        _client.set_activity(conf.to_activity())
 
         # Keep a previous config for sake of application ID matching and related
         # checks on future loops.

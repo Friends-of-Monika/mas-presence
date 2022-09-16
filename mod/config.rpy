@@ -124,9 +124,7 @@ init -100 python in fom_presence:
             return default
 
     def _provider(provide):
-        return type("Provider", (object, ), dict(
-            get=lambda self: provide()
-        ))()
+        return type("Provider", (object,), dict(get=lambda self: provide()))()
 
     def _subst_str_provider(s):
         def provide():
@@ -177,6 +175,31 @@ init -100 python in fom_presence:
             c = configparser.ConfigParser()
             c.read(path)
             return Config(c)
+
+        @property
+        def activity(self):
+            a = Activity()
+
+            if self.state is not None:
+                a.state = self.state.get()
+            if self.details is not None:
+                a.details = self.details.get()
+
+            if self.start_ts is not None:
+                a.timestamps.start = self.start_ts.get()
+            if self.stop_ts is not None:
+                a.timestamps.end = self.stop_ts.get()
+
+            if self.large_image is not None:
+                a.assets.large_image = self.large_image
+                if self.large_text is not None:
+                    a.assets.large_text = self.large_text.get()
+            if self.small_image is not None:
+                a.assets.small_image = self.small_image
+                if self.small_text is not None:
+                    a.assets.small_text = self.small_text.get()
+
+            return a
 
 
     _configs = list()
