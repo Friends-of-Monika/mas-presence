@@ -35,7 +35,7 @@ init -100 python in fom_presence:
     OP_PING = 3
     OP_PONG = 4
 
-    ## CMD types
+    ## Command types
 
     CMD_SET_ACTIVITY = "SET_ACTIVITY"
     CMD_DISPATCH = "DISPATCH"
@@ -51,19 +51,72 @@ init -100 python in fom_presence:
     ## Unix domain socket
 
     class _UnixSocket(object):
+        """
+        Unix (Linux, Darwin) implementation of Discord RPC socket.
+
+        Key differences from Windows implementation include "sendall" as "write"
+        and "recv" as "read."
+        """
+
         def __init__(self, socket):
+            """
+            Constructor function for creating a new socket abstraction wrapper
+            from a Unix socket object (must support sendall, recv and close.)
+
+            IN:
+                socket -> socket:
+                    Unix socket object to wrap.
+            """
+
             self._sock = socket
 
         def write(self, data):
+            """
+            Writes the provided data array to this socket.
+
+            IN:
+                data -> Iterable[byte]:
+                    Array, list or any other iterable containing bytes to write.
+            """
+
             self._sock.sendall(data)
 
         def read(self, size):
+            """
+            Reads data into buffer of the specified size.
+
+            IN:
+                size -> int:
+                    Amount of bytes to read from the socket.
+
+            OUT:
+                bytes:
+                    Read buffer of data (size of 0 to size.)
+            """
+
             return self._sock.recv(size)
 
         def close(self):
+            """
+            Closes the wrapped socket.
+            """
+
             self._sock.close()
 
     def _unix_get_socket():
+        """
+        Locates Unix socket of Discord RPC using $XDG_RUNTIME_DIR, $TMPDIR,
+        $TMP and $TEMP environment variables as base path and probes sockets
+        0-9.
+
+        OUT:
+            socket.socket:
+                Unix socket connected to Discord RPC socket.
+
+            None:
+                None is returned when Discord RPC socket could not be located.
+        """
+
         # Find suitable runtime/temporary directory path from environment
         # variables, or fall back to /tmp. This below merely filters out all
         # None paths and picks the first, or returns "/tmp".
@@ -86,19 +139,71 @@ init -100 python in fom_presence:
     ## Windows named pipe
 
     class _WindowsSocket(object):
+        """
+        Windows implementation of Discord RPC socket using named pipe.
+
+        Key differences from Unix implementation include "write" as "sendall"
+        and "read" as "recv."
+        """
+
         def __init__(self, socket):
+            """
+            Constructor function for creating a new socket abstraction wrapper
+            from a readable, writeable and closeable io object.
+
+            IN:
+                socket -> file:
+                    File object to wrap.
+            """
+
             self._sock = socket
 
         def write(self, data):
+            """
+            Writes the provided data array to this socket.
+
+            IN:
+                data -> Iterable[byte]:
+                    Array, list or any other iterable containing bytes to write.
+            """
+
             self._sock.write(data)
 
         def read(self, size):
+            """
+            Reads data into buffer of the specified size.
+
+            IN:
+                size -> int:
+                    Amount of bytes to read from the socket.
+
+            OUT:
+                bytes:
+                    Read buffer of data (size of 0 to size.)
+            """
+
             return self._sock.read(size)
 
         def close(self):
+            """
+            Closes the wrapped socket.
+            """
+
             self._sock.close()
 
     def _win_get_socket():
+        """
+        Uses Windows namespace path (\\?\pipe\ + pipe name) to open a named
+        pipe that is a Discord RPC socket. Probes sockets 0-9.
+
+        OUT:
+            File object:
+                File-like object connected to Discord RPC named pipe.
+
+            None:
+                None is returned when Discord RPC pipe could not be located.
+        """
+
         # On Windows, using pipe namespace path like this.
         base_path = r"\\?\pipe"
 
@@ -129,6 +234,11 @@ init -100 python in fom_presence:
     # User activity wrapper class definitions
 
     class Assets(object):
+        """
+        Assets class contains fields representing presence assets (large and
+        small images) and their captions.
+        """
+
         def __init__(
             self,
             large_image=None,
@@ -136,12 +246,38 @@ init -100 python in fom_presence:
             small_image=None,
             small_text=None
         ):
+            """
+            Constructs a new Asset object with provided large/small images and
+            their captions. Images may be asset names as well as image URLs.
+
+            IN:
+                large_image -> str, default None:
+                    Large image asset key or URL.
+
+                large_text -> str, default None:
+                    Large image caption.
+
+                small_image -> str, default None:
+                    Small image asset key or URL.
+
+                small_text -> str, default None:
+                    Small image caption.
+            """
+
             self.large_image = large_image
             self.large_text = large_text
             self.small_image = small_image
             self.small_text = small_text
 
         def to_dict(self):
+            """
+            Converts this object to dict.
+
+            OUT:
+                Dict[str, Any]:
+                    Dictionary containing this object fields and their values.
+            """
+
             d = dict()
 
             if self.large_image is not None:
@@ -156,11 +292,35 @@ init -100 python in fom_presence:
             return d
 
     class Timestamps(object):
+        """
+        Timestamps class contaisn fields representing presence timestamps
+        (start and end.)
+        """
+
         def __init__(self, start=None, end=None):
+            """
+            Constructs a new Timestamps instance with provided timestamps.
+
+            IN:
+                start -> int, default None:
+                    Start timestamp.
+
+                end -> int, default None:
+                    End timestamp.
+            """
+
             self.start = start
             self.end = end
 
         def to_dict(self):
+            """
+            Converts this object to dict.
+
+            OUT:
+                Dict[str, Any]:
+                    Dictionary containing this object fields and their values.
+            """
+
             d = dict()
 
             if self.start is not None:
@@ -171,6 +331,10 @@ init -100 python in fom_presence:
             return d
 
     class Activity(object):
+        """
+        Activity class represents Rich Presence activity.
+        """
+
         def __init__(
             self,
             state=None,
@@ -178,6 +342,29 @@ init -100 python in fom_presence:
             timestamps=None,
             assets=None
         ):
+            """
+            Constructs a new Activity instance with provided parameters.
+
+            IN:
+                state -> str or None, default None:
+                    State of activity.
+
+                details -> str or None, default None:
+                    Details of activity.
+
+                timestamps -> Timestamps or None, default None:
+                    Timestamps of activity.
+
+                assets -> Assets or None, default None:
+                    Assets of activity.
+            NOTE:
+                See this chart to have an idea of what is what:
+                https://discord.com/assets/43bef54c8aee2bc0fd1c717d5f8ae28a.png
+
+                Not all parameters are supported, some were omitted as they
+                did not fit the idea of the submod.
+            """
+
             self.state = state
             self.details = details
 
@@ -190,6 +377,14 @@ init -100 python in fom_presence:
             self.assets = assets
 
         def to_dict(self):
+            """
+            Converts this object to dict recursively.
+
+            OUT:
+                Dict[str, Any]:
+                    Dictionary containing this object fields and their values.
+            """
+
             d = dict()
 
             if self.state is not None:
