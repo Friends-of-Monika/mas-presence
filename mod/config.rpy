@@ -112,11 +112,6 @@ init -100 python in fom_presence:
     config_dir = _get_conf_dir()
 
 
-    def _parse_bool(s):
-        if s.lower() in ("true", "yes", "y"):
-            return True
-        return False
-
     def _get_conf_value(parser, section, value, deserializer=str, default=None):
         try:
             return deserializer(parser.get(section, value, raw=True))
@@ -157,7 +152,6 @@ init -100 python in fom_presence:
             self.priority = _get_conf_value(parser, "Presence", "Priority", int)
 
             self.app_id = _get_conf_value(parser, "Client", "ApplicationID", int)
-            self.retry_on_fail = _get_conf_value(parser, "Client", "RetryOnFail", _parse_bool)
 
             self.details = _get_conf_value(parser, "Activity", "Details", _subst_str_provider)
             self.state = _get_conf_value(parser, "Activity", "State", _subst_str_provider)
