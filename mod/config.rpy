@@ -140,19 +140,15 @@ init -100 python in fom_presence:
         return int(time.mktime(dt.timetuple()) + dt.microsecond / 1000000.0)
 
     def _parse_ts_provider(s):
-        return _dt_to_ts(_timestamp_type.get(s.lower()))
+        return _timestamp_type.get(s.lower())
 
     def _ts_none():
         return None
     _timestamp_type["none"] = _provider(_ts_none)
 
     def _ts_session_start():
-        return persistent.sessions["current_session_start"]
+        return _dt_to_ts(persistent.sessions["current_session_start"])
     _timestamp_type["sessionstart"] = _provider(_ts_session_start)
-
-    def _ts_first_session():
-        return persistent.sessions["first_session"]
-    _timestamp_type["firstsession"] = _provider(_ts_first_session)
 
 
     class Config(object):
