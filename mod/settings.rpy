@@ -42,7 +42,7 @@ init 100 python in fom_presence:
         if not persistent._fom_presence_enabled and fom_presence._presence.connected:
             fom_presence._presence.disconnect()
 
-        elif persistent._fom_presence_enabled and not fom_presence.connected:
+        elif persistent._fom_presence_enabled and not fom_presence._presence.connected:
             fom_presence._presence._reconnect()
 
     def _sscr_reconnect():
