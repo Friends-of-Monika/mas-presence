@@ -45,10 +45,11 @@ init -99 python in fom_presence:
                 _disconnect_client()
                 return
 
-        if _prev_conf is not None and conf.app_id != _prev_conf.app_id:
-            # If application IDs mismatch, we need to reconnect.
-            _disconnect_client()
-            _connect_client(conf.app_id)
+            if _prev_conf is not None and conf.app_id != _prev_conf.app_id:
+                # If application IDs mismatch, we need to reconnect. Only
+                # do it if there is a client connection open.
+                _disconnect_client()
+                _connect_client(conf.app_id)
 
         # Set activity from this presence config.
         _client.set_activity(conf.activity)
