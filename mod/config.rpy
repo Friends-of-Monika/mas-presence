@@ -180,17 +180,23 @@ init -100 python in fom_presence:
             return Config(c)
 
 
-    def get_active_config():
-        configs = list()
+    _configs = list()
 
+    def _load_configs():
         for _dir, _, files in os.walk(config_dir):
             for _file in files:
-                c = Config.load_file(os.path.join(_dir, _file))
-                if bool(eval(c.condition, _ext_vars, store.__dict__)):
-                    configs.append(c)
+                _configs.append(Config.load_file(os.path.join(_dir, _file)))
 
-        if len(configs) == 0:
+
+    def get_active_config():
+        active = list()
+
+        for conf in _configs:
+            if bool(eval(conf.condition, _ext_vars, store.__dict__)):
+                active.append(conf)
+
+        if len(active) == 0:
             return None
 
-        configs.sort(key=lambda it: it.priority, reverse=True)
-        return configs[0]
+        active.sort(key=lambda it: it.priority, reverse=True)
+        return active[0]

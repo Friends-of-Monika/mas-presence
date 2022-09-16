@@ -79,6 +79,7 @@ init -99 python in fom_presence:
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop")
     def _preloop():
+        _load_configs()
         _update_loc_prompt()
         _update_presence()
 
