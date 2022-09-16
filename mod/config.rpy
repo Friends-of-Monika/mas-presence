@@ -29,7 +29,7 @@ init 90 python in fom_presence:
 
     def _subst_str_provider(s):
         def provide():
-            return renpy.substitute(s, _ext_vars)
+            return renpy.substitute(s, _uservars)
         return _Provider(provide)
 
 
