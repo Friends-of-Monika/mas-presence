@@ -5,10 +5,11 @@ init 90 python in fom_presence:
     import store
     from store import persistent
 
+    import sys
     import os
     import time
 
-    if PY2:
+    if sys.version_info.major == 2:
         import ConfigParser as configparser
     else:
         import configparser
