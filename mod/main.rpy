@@ -66,7 +66,7 @@ init 100 python in fom_presence:
                 self.disconnect()
                 return
 
-            self.reload()
+            self._reload()
 
         def _reload(self):
             self._update_with_conf(self._curr_conf)
