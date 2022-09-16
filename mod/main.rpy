@@ -73,6 +73,7 @@ init -99 python in fom_presence:
         _update_loc_prompt()
         _update_presence()
 
+
     # Runs on exit.
     @store.mas_submod_utils.functionplugin("exit")
     def _exit():
