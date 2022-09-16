@@ -20,14 +20,14 @@ init 100:
 
                 textbutton "Reconnect":
                     selected False
-                    insensitive fom_presence._presence.connected
+                    sensitive fom_presence._presence.connected
                     action Function(fom_presence._sscr_reconnect)
                     hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
                     unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
                 textbutton "Reload":
                     selected False
-                    insensitive fom_presence._presence.connected
+                    sensitive fom_presence._presence.connected
                     action Function(fom_presence._sscr_reload)
                     hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
                     unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
