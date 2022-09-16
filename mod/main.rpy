@@ -3,10 +3,10 @@ init -99 python in fom_presence:
     _client = None
     _prev_conf = None
 
-    def _connect_client(conf):
+    def _connect_client(app_id):
         global _client
         _client = Client(get_rpc_socket())
-        _client.handshake(conf.app_id)
+        _client.handshake(app_id)
 
     def _disconnect_client():
         try:
@@ -32,7 +32,7 @@ init -99 python in fom_presence:
 
         if _client is None:
             # On first loop there just isn't any client.
-            _connect_client(conf)
+            _connect_client(conf.app_id)
 
         else:
             # On consecutive loops, we need to ensure socket still replies.
@@ -49,10 +49,10 @@ init -99 python in fom_presence:
         if _prev_conf is not None and conf.app_id != _prev_conf.app_id:
             # If application IDs mismatch, we need to reconnect.
             _disconnect_client()
-            _connect_client(conf)
+            _connect_client(conf.app_id)
 
         # Set activity from this presence config.
-        _client.set_activity(conf.to_activity())
+        _client.set_activity(conf.activity)
 
         # Keep a previous config for sake of application ID matching and related
         # checks on future loops.
