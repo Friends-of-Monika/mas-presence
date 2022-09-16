@@ -108,7 +108,7 @@ init 90 python in fom_presence:
         for _dir, _, files in os.walk(config_dir):
             for _file in files:
                 try:
-                    _configs.append(Config.load_file(os.path.join(_dir, _file)))
+                    _configs.append((_file, Config.load_file(os.path.join(_dir, _file))))
 
                 except configparser.ParsingError as e:
                     # TODO: Notify user with a toast message
@@ -117,7 +117,7 @@ init 90 python in fom_presence:
     def get_active_config():
         active = list()
 
-        for conf in _configs:
+        for _file, conf in _configs:
             try:
                 if bool(eval(conf.condition, _ext_vars, store.__dict__)):
                     active.append(conf)
