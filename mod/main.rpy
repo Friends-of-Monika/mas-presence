@@ -36,7 +36,6 @@ init -99 python in fom_presence:
 
         else:
             # On consecutive loops, we need to ensure socket still replies.
-
             try:
                 # Ensure socket is still responsive.
                 _client.ping()
