@@ -1,29 +1,48 @@
-screen fom_presence_settings_pane:
-    $ scr_tooltip = renpy.get_screen("submods", "screens").scope["tooltip"]
+init 100:
 
-    vbox:
-        box_wrap False
-        xfill True
-        xmaximum 800
+    screen fom_presence_settings_pane:
+        $ scr_tooltip = renpy.get_screen("submods", "screens").scope["tooltip"]
 
-        hbox:
-            style_prefix "check"
+        vbox:
             box_wrap False
+            xfill True
+            xmaximum 800
 
-            textbutton "Enabled":
-                selected persistent._fom_presence_enabled
-                action Function(fom_presence._sscr_toggle)
-                hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
-                unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+            hbox:
+                style_prefix "check"
+                box_wrap False
 
-            textbutton "Reconnect":
-                selected False
-                action Function(fom_presence._sscr_reconnect)
-                hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
-                unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                textbutton "Enabled":
+                    selected persistent._fom_presence_enabled
+                    action Function(fom_presence._sscr_toggle)
+                    hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
+                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
-            textbutton "Reload":
-                selected False
-                action Function(fom_presence._sscr_reload)
-                hovered SetField(scr_tooltip, "value", "Forcibly reload current activity.")
-                unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                textbutton "Reconnect":
+                    selected False
+                    insensitive fom_presence._presence.connected
+                    action Function(fom_presence._sscr_reconnect)
+                    hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
+                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+
+                textbutton "Reload":
+                    selected False
+                    insensitive fom_presence._presence.connected
+                    action Function(fom_presence._sscr_reload)
+                    hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
+                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+
+
+    def _sscr_toggle():
+        persistent._fom_presence_enabled = not persistent._fom_presence_enabled
+        if not persistent._fom_presence_enabled and fom_presence._presence.connected:
+            fom_presence._presence.disconnect()
+
+        elif persistent._fom_presence_enabled and not fom_presence.connected:
+            fom_presence._presence._reconnect()
+
+    def _sscr_reconnect():
+        _presence._reconnect()
+
+    def _sscr_reload():
+        _presence._reload()
