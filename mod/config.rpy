@@ -1,4 +1,6 @@
-init -100 python in fom_presence:
+default persistent._fom_presence_enable = True
+
+init 90 python in fom_presence:
 
     import store
     from store import persistent
