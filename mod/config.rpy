@@ -119,7 +119,7 @@ init 90 python in fom_presence:
 
         for _file, conf in _configs:
             try:
-                if bool(eval(conf.condition, _ext_vars, store.__dict__)):
+                if bool(eval(conf.condition, _uservars, store.__dict__)):
                     active.append(conf)
 
             except Exception as e:
