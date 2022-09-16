@@ -30,7 +30,7 @@ init 90 python in fom_presence:
     def _subst_str_provider(s):
         def provide():
             return renpy.substitute(s, _ext_vars)
-        return _provider(provide)
+        return _Provider(provide)
 
 
     _timestamp_type = dict()
