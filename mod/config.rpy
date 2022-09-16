@@ -107,14 +107,24 @@ init 90 python in fom_presence:
     def _load_configs():
         for _dir, _, files in os.walk(config_dir):
             for _file in files:
-                _configs.append(Config.load_file(os.path.join(_dir, _file)))
+                try:
+                    _configs.append(Config.load_file(os.path.join(_dir, _file)))
+
+                except configparser.ParsingError as e:
+                    # TODO: Notify user with a toast message
+                    _error("Could not load presence config from file {0}: {1}".format(_file, e))
 
     def get_active_config():
         active = list()
 
         for conf in _configs:
-            if bool(eval(conf.condition, _ext_vars, store.__dict__)):
-                active.append(conf)
+            try:
+                if bool(eval(conf.condition, _ext_vars, store.__dict__)):
+                    active.append(conf)
+
+            except Exception as e:
+                # TODO: Notify user with a toast message
+                _error("Could not evaluate presence config condition in file {0}: {1}".format(_file, e))
 
         if len(active) == 0:
             return None

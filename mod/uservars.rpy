@@ -3,7 +3,7 @@ init 100 python in fom_presence:
     import store
     from store import persistent, mas_background
 
-    _ext_vars = dict()
+    _uservars = dict()
 
     def _update_loc_prompt():
         bg = mas_background.BACKGROUND_MAP[persistent._mas_current_background]
@@ -13,7 +13,7 @@ init 100 python in fom_presence:
             # If prompt is Title-cased, decapitalize it.
             prompt = prompt[0].lower() + prompt[1:]
 
-        _ext_vars["loc_prompt"] = prompt
+        _uservars["loc_prompt"] = prompt
 
 
     def _update_uservars():
