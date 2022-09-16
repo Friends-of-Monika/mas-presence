@@ -128,28 +128,31 @@ init -100 python in fom_presence:
             get=lambda self: provide()
         ))()
 
+    def _subst_str_provider(s):
+        def provide():
+            return renpy.substitute(s, _ext_vars)
+        return _provider(provide)
+
 
     _timestamp_type = dict()
 
     def _dt_to_ts(dt):
         return int(time.mktime(dt.timetuple()) + dt.microsecond / 1000000.0)
 
+    def _parse_ts_provider(s):
+        return _dt_to_ts(_timestamp_type.get(s.lower()))
+
     def _ts_none():
         return None
-    _timestamp_type["None"] = _provider(_ts_none)
+    _timestamp_type["none"] = _provider(_ts_none)
 
     def _ts_session_start():
-        return _dt_to_ts(persistent.sessions["current_session_start"])
-    _timestamp_type["SessionStart"] = _provider(_ts_session_start)
+        return persistent.sessions["current_session_start"]
+    _timestamp_type["sessionstart"] = _provider(_ts_session_start)
 
-    def _parse_ts_provider(s):
-        return _timestamp_type.get(s)
-
-
-    def _subst_str_provider(s):
-        def provide():
-            return renpy.substitute(s, _ext_vars)
-        return _provider(provide)
+    def _ts_first_session():
+        return persistent.sessions["first_session"]
+    _timestamp_type["firstsession"] = _provider(_ts_first_session)
 
 
     class Config(object):
