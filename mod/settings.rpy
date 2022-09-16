@@ -32,7 +32,7 @@ init 100:
                     hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
                     unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
-    python:
+init 100 python in fom_presence:
 
         def _sscr_toggle():
             persistent._fom_presence_enabled = not persistent._fom_presence_enabled
