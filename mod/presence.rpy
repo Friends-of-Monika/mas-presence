@@ -1,15 +1,14 @@
+# presence.rpy contains Discord Rich Presence IPC/RPC protocol implementation
+# designed specifically for the needs of Discord Presence Submod.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
 
-#
-# Lightweight dependency-less Discord RPC implementation made solely for the
-# needs of Discord Presence Submod for Monika After Story.
-#
-# Author: Herman S. <dreamscache.d@gmail.com>
-#
-# Sources:
+# In the development and debugging phase of this Discord RPC/IPC API the
+# follow resources were used (thanks ImKventis and Discord Developers):
 # - https://github.com/ImKventis/MAS_RPC/blob/ab5209114d6165ad1c94a6d1aa75ccd695e3d1ef/game/Submods/Kventis_RPC/kventis_rpc.rpy
 # - https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md
 # - https://discord.com/developers/docs/rich-presence/how-to
-#
 
 init -100 python in fom_presence:
 
@@ -403,6 +402,8 @@ init -100 python in fom_presence:
     ## Packet implementation
 
     class Packet(object):
+        # TODO: Documentation here and further on
+
         def __init__(self, opcode, payload=None):
             self.opcode = opcode
             self.payload = payload

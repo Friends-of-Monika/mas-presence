@@ -1,3 +1,10 @@
+# lib.rpy performs Python module lookup path modifications in order to enable
+# Python modules from lib/ folder to work with Ren'Py 6 distribution of MAS.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
+
 init -999 python in fom_presence:
 
     import sys

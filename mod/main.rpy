@@ -1,3 +1,10 @@
+# main.rpy is the entrypoint into Discord Presence Submod, containing label
+# plugins (hooks) and presence controller, main logic governoring the Rich
+# Presence displayed on user's profile.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
 init 100 python in fom_presence:
 
     class _PresenceController(object):

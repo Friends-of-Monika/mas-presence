@@ -1,3 +1,8 @@
+# header.rpy contains MAS submod header as well as Submod Updater header.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
 init -990 python in mas_submod_utils:
     Submod(
         author="Friends of Monika",

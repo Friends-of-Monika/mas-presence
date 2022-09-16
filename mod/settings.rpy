@@ -1,3 +1,9 @@
+# settings.rpy contains settings panel rendered in submods menu under
+# Discord Presence Submod entry as well as functions invoked on button presses.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
 init 100:
 
     screen fom_presence_settings_pane:
@@ -31,6 +37,7 @@ init 100:
                     action Function(fom_presence._sscr_reload)
                     hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
                     unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+
 
 init 100 python in fom_presence:
 

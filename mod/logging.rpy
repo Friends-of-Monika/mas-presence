@@ -1,3 +1,9 @@
+# logging.rpy contains constants and functions for prefixed logging of
+# Discord Presence Submod messages in submod log.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
 init -100 python in fom_presence:
 
     import store

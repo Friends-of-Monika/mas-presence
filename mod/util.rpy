@@ -1,3 +1,10 @@
+# util.rpy contains miscellaneous utility functions and classes that can be
+# reused in the rest of the Discord Presence Submod codebase.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
+
 init -1000 python in fom_presence:
 
     import os
