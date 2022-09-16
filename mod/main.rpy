@@ -69,7 +69,7 @@ init 100 python in fom_presence:
             self.reload()
 
         def _reload(self):
-            self._update_with_conf(slf, self._curr_conf)
+            self._update_with_conf(self._curr_conf)
 
         def _update_with_conf(self, conf):
             try:
