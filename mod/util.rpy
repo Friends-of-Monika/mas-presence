@@ -1,5 +1,8 @@
 init -1000 python in fom_presence:
 
+    import os
+
+
     def _get_script_file(fallback=None, relative=False):
         """
         Uses internal Ren'Py function renpy.get_filename_line() to locate
