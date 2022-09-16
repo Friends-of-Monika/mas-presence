@@ -37,7 +37,7 @@ init 100 python in fom_presence:
 
             try:
                 _update_uservars()
-                self._client.set_activity(conf.activity)
+                cl.set_activity(conf.activity)
 
             except Exception as e:
                 # TODO: Notify user with a toast message
