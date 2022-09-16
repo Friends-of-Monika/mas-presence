@@ -61,7 +61,7 @@ init 100 python in fom_presence:
 
         def update(self):
             self._curr_conf = get_active_config()
-            if conf is None:
+            if self._curr_conf is None:
                 # Disconnect if there isn't any active configs anymore.
                 self.disconnect()
                 return
