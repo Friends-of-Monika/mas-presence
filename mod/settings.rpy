@@ -32,17 +32,18 @@ init 100:
                     hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
                     unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
+    python:
 
-    def _sscr_toggle():
-        persistent._fom_presence_enabled = not persistent._fom_presence_enabled
-        if not persistent._fom_presence_enabled and fom_presence._presence.connected:
-            fom_presence._presence.disconnect()
+        def _sscr_toggle():
+            persistent._fom_presence_enabled = not persistent._fom_presence_enabled
+            if not persistent._fom_presence_enabled and fom_presence._presence.connected:
+                fom_presence._presence.disconnect()
 
-        elif persistent._fom_presence_enabled and not fom_presence.connected:
-            fom_presence._presence._reconnect()
+            elif persistent._fom_presence_enabled and not fom_presence.connected:
+                fom_presence._presence._reconnect()
 
-    def _sscr_reconnect():
-        _presence._reconnect()
+        def _sscr_reconnect():
+            _presence._reconnect()
 
-    def _sscr_reload():
-        _presence._reload()
+        def _sscr_reload():
+            _presence._reload()
