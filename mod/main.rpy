@@ -37,33 +37,37 @@ init 100 python in fom_presence:
             try:
                 cl = Client(get_rpc_socket())
                 cl.handshake(conf.app_id)
+
                 self.ectx.resolve(
                     _ERR_CON, "Connection with Discord established."
                 )
 
-            except (CallError, IOError) as e:
+            except (CallError, ProtocolError) as e:
+                _error("Could not connect to Discord RPC: {0}".format(e))
                 self.ectx.report(
                     _ERR_CON,
                     "Could not connect to Discord. Ensure it is running or\n"
                     "see details in log/submod_log.log"
                 )
-                _error("Could not connect to Discord RPC: {0}".format(e))
+
                 return
 
             try:
                 _update_uservars()
                 cl.set_activity(conf.activity)
+
                 self.ectx.resolve(
                     _ERR_ACT, "Presence activity updated."
                 )
 
             except Exception as e:
+                _error("Could not set initial activity: {0}".format(e))
                 self.ectx.report(
                     _ERR_ACT,
                     "Could not update presence activity. Ensure Discord is "
                     "running or\nsee details in log/submod_log.log"
                 )
-                _error("Could not set initial activity: {0}".format(e))
+
                 return
 
             self._client = cl
@@ -95,34 +99,37 @@ init 100 python in fom_presence:
         def _update_with_conf(self, conf):
             try:
                 self._client.ping()
+
                 self.ectx.resolve(
                     _ERR_PIN, "Connection with Discord re-established."
                 )
 
             except (CallError, IOError) as e:
+                _error("Discord RPC is not responding: {0}".format(e))
                 self.ectx.report(
                     _ERR_PIN,
                     "Discord is not responding. Ensure it is running or\n"
                     "see details in log/submod_log.log"
                 )
-                _error("Discord RPC is not responding: {0}".format(e))
+
                 self.disconnect()
                 return
 
             try:
                 _update_uservars()
                 self._client.set_activity(conf.activity)
+
                 self.ectx.resolve(
                     _ERR_ACT, "Presence activity updated."
                 )
 
             except Exception as e:
+                _error("Could not set Rich Presence activity: {0}".format(e))
                 self.ectx.report(
                     _ERR_ACT,
                     "Could not update presence activity. Ensure Discord is "
                     "running or\nsee details in log/submod_log.log"
                 )
-                _error("Could not set Rich Presence activity: {0}".format(e))
 
 
     _presence = _PresenceController()

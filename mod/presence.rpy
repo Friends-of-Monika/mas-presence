@@ -506,6 +506,12 @@ init -100 python in fom_presence:
         def __str__(self):
             return str("[Error {0}] {1}".format(self.code, self.message))
 
+    ## Protocol error wrapping packet IO errors
+
+    class ProtocolError(Exception):
+        def __init__(self, error):
+            super(ProtocolError, self).__init__(error)
+
 
     # Remote Procedure Call client implementation
 
@@ -514,8 +520,11 @@ init -100 python in fom_presence:
             self._sock = socket
 
         def call(self, packet):
-            packet.dump(self._sock)
-            rp = Packet.load(self._sock)
+            try:
+                packet.dump(self._sock)
+                rp = Packet.load(self._sock)
+            except Exception as e:
+                raise ProtocolError(e)
 
             err = CallError.from_packet(rp)
             if err is not None:
