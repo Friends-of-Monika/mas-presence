@@ -16,4 +16,7 @@ mkdir -p "$temp/game/Submods"
 cp -r "$dir/mod" "$temp/game/Submods/$name"
 cp -r "$dir/config" "$temp/game/Submods/$name/config"
 cp -r "$dir/lib" "$temp/game/Submods/$name/lib"
-(cd "$temp" || exit 1; find game | zip -9@ "$dir/$package-$version.zip" && rm -rf "$temp")
+
+rm "$temp/game/Submods/$name/lib/README.txt"
+
+(cd "$temp" || exit 1; find game | zip -9@q "$dir/$package-$version.zip" && rm -rf "$temp")
