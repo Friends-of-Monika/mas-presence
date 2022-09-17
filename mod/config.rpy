@@ -35,6 +35,11 @@ init 90 python in fom_presence:
         except (configparser.NoOptionError, configparser.NoSectionError) as e:
             return default
 
+    def _bool(s):
+        if s.lower() in ("true", "yes", "y"):
+            return True
+        return False
+
     def _subst_str_provider(s):
         def provide():
             return renpy.substitute(s, _uservars)
@@ -64,6 +69,7 @@ init 90 python in fom_presence:
             compile(condition, "<string>", "eval")
             self.condition = condition
             self.priority = _get_conf_value(parser, "Presence", "Priority", int)
+            self.dynamic = _get_conf_value(parser, "Presence", "Dynamic", _bool)
 
             self.app_id = _get_conf_value(parser, "Client", "ApplicationID", int)
 
@@ -78,6 +84,8 @@ init 90 python in fom_presence:
             self.start_ts = _get_conf_value(parser, "Timestamps", "Start", _parse_ts_provider)
             self.stop_ts = _get_conf_value(parser, "Timestamps", "End", _parse_ts_provider)
 
+            self._activity = None
+
         @staticmethod
         def load_file(path):
             c = configparser.ConfigParser()
@@ -86,6 +94,9 @@ init 90 python in fom_presence:
 
         @property
         def activity(self):
+            if self._activity is not None:
+                return self._activity
+
             a = Activity()
 
             if self.state is not None:
@@ -107,6 +118,8 @@ init 90 python in fom_presence:
                 if self.small_text is not None:
                     a.assets.small_text = self.small_text.get()
 
+            if not self.dynamic:
+                self._activity = a
             return a
 
 
