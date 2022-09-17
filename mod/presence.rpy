@@ -523,7 +523,7 @@ init -100 python in fom_presence:
             try:
                 packet.dump(self._sock)
                 rp = Packet.load(self._sock)
-            except Exception as e:
+            except (struct.error, IOError) as e:
                 raise ProtocolError(e)
 
             err = CallError.from_packet(rp)
