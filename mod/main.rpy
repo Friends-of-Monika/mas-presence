@@ -38,6 +38,7 @@ init 100 python in fom_presence:
                 cl = Client(get_rpc_socket())
                 cl.handshake(conf.app_id)
 
+                self.ectx.resolve(_ERR_PIN)
                 self.ectx.resolve(
                     _ERR_CON, "Connection with Discord established."
                 )
