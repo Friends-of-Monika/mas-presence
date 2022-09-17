@@ -115,6 +115,13 @@ init 90 python in fom_presence:
     def _load_configs():
         for _dir, _, files in os.walk(config_dir):
             for _file in files:
+                if not (
+                    _file.endswith(".ini") or
+                    _file.endswith(".cfg") or
+                    _file.endswith(".conf")
+                ):
+                    continue
+
                 try:
                     _configs.append((_file, Config.load_file(os.path.join(_dir, _file))))
 
