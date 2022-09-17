@@ -131,17 +131,19 @@ init 100 python in fom_presence:
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop")
     def _preloop():
-        _load_configs()
-        _presence.connect()
+        if persistent._fom_presence_enabled:
+            _load_configs()
+            _presence.connect()
 
 
     # Runs approximately once per 5 seconds while not in dialogue.
     @store.mas_submod_utils.functionplugin("ch30_loop")
     def _loop():
-        if _presence.connected:
-            _presence.update()
-        else:
-            _presence.connect()
+        if persistent._fom_presence_enabled:
+            if _presence.connected:
+                _presence.update()
+            else:
+                _presence.connect()
 
 
     # Runs on exit.

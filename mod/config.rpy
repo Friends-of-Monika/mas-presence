@@ -5,7 +5,7 @@
 # This file is part of Discord Presence Submod (see link below):
 # https://github.com/friends-of-monika/discord-presence-submod
 
-default persistent._fom_presence_enable = True
+default persistent._fom_presence_enabled = True
 
 init 90 python in fom_presence:
 
