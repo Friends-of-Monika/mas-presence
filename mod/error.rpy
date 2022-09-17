@@ -1,3 +1,11 @@
+# error.rpy contains error contexts that are used to appropriately display
+# error notifications using report/resolve model, once a problem is reported and
+# flashed on screen, no new errors cause a flash; on resolve, a message is shown
+# and error messages can be shown again.
+#
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/discord-presence-submod
+
 init 50 python in fom_presence:
 
     _ERR_CFG = "cfg"

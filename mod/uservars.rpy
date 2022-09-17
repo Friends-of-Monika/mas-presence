@@ -4,7 +4,6 @@
 # This file is part of Discord Presence Submod (see link below):
 # https://github.com/friends-of-monika/discord-presence-submod
 
-
 init 100 python in fom_presence:
 
     import store
