@@ -45,15 +45,29 @@ init 100 python in fom_presence:
     from store import persistent, fom_presence
 
     def _sscr_toggle():
-        persistent._fom_presence_enabled = not persistent._fom_presence_enabled
-        if not persistent._fom_presence_enabled and fom_presence._presence.connected:
-            fom_presence._presence.disconnect()
+        try:
+            fom_presence._presence.ectx = _ectx_opts
 
-        elif persistent._fom_presence_enabled and not fom_presence._presence.connected:
-            fom_presence._presence._reconnect()
+            persistent._fom_presence_enabled = not persistent._fom_presence_enabled
+            if not persistent._fom_presence_enabled and fom_presence._presence.connected:
+                fom_presence._presence.disconnect()
+
+            elif persistent._fom_presence_enabled and not fom_presence._presence.connected:
+                fom_presence._presence._reconnect()
+
+        finally:
+            fom_presence._presence.ectx = _ectx_main
 
     def _sscr_reconnect():
-        _presence._reconnect()
+        try:
+            fom_presence._presence.ectx = _ectx_opts
+            _presence._reconnect()
+        finally:
+            fom_presence._presence.ectx = _ectx_main
 
     def _sscr_reload():
-        _presence._reload()
+        try:
+            fom_presence._presence.ectx = _ectx_opts
+            _presence._reload()
+        finally:
+            fom_presence._presence.ectx = _ectx_main
