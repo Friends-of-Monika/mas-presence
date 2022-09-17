@@ -40,6 +40,8 @@ init 90 python in fom_presence:
             return True
         return False
 
+    _none_provider = _Provider(lambda: None)
+
     def _subst_str_provider(s):
         def provide():
             return renpy.substitute(s, _uservars)
@@ -68,21 +70,21 @@ init 90 python in fom_presence:
             condition = _get_conf_value(parser, "Presence", "Condition")
             compile(condition, "<string>", "eval")
             self.condition = condition
-            self.priority = _get_conf_value(parser, "Presence", "Priority", int)
-            self.dynamic = _get_conf_value(parser, "Presence", "Dynamic", _bool)
+            self.priority = _get_conf_value(parser, "Presence", "Priority", int, 0)
+            self.dynamic = _get_conf_value(parser, "Presence", "Dynamic", _bool, False)
 
             self.app_id = _get_conf_value(parser, "Client", "ApplicationID", int)
 
-            self.details = _get_conf_value(parser, "Activity", "Details", _subst_str_provider)
-            self.state = _get_conf_value(parser, "Activity", "State", _subst_str_provider)
+            self.details = _get_conf_value(parser, "Activity", "Details", _subst_str_provider, _none_provider)
+            self.state = _get_conf_value(parser, "Activity", "State", _subst_str_provider, _none_provider)
 
             self.large_image = _get_conf_value(parser, "Assets", "LargeImage")
-            self.large_text = _get_conf_value(parser, "Assets", "LargeText", _subst_str_provider)
+            self.large_text = _get_conf_value(parser, "Assets", "LargeText", _subst_str_provider, _none_provider)
             self.small_image = _get_conf_value(parser, "Assets", "SmallImage")
-            self.small_text = _get_conf_value(parser, "Assets", "SmallText", _subst_str_provider)
+            self.small_text = _get_conf_value(parser, "Assets", "SmallText", _subst_str_provider, _none_provider)
 
-            self.start_ts = _get_conf_value(parser, "Timestamps", "Start", _parse_ts_provider)
-            self.stop_ts = _get_conf_value(parser, "Timestamps", "End", _parse_ts_provider)
+            self.start_ts = _get_conf_value(parser, "Timestamps", "Start", _parse_ts_provider, _none_provider)
+            self.stop_ts = _get_conf_value(parser, "Timestamps", "End", _parse_ts_provider, _none_provider)
 
             self._activity = None
 
