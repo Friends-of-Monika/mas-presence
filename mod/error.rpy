@@ -7,22 +7,25 @@ init 50 python in fom_presence:
 
 
     class _ErrorContext(object):
-        def __init__(self, stack=False):
+        def __init__(self, max_stack=1):
             self._reports = dict()
-            self._stack = stack
+            self._max_stack = max_stack
 
         def report(self, _type, message):
-            if _type not in self._reports or self._stack:
+            stack = self._reports.get(_type, 0)
+            if stack <= self._max_stack or stack < 0:
                 renpy.notify(message)
-                self._reports[_type] = 1
 
-            else:
-                self._reports[_type] += 1
+                if _type in self._reports:
+                    self._reports[_type] = 0
 
-        def resolve(self, _type, message):
-            if self._reports.pop(_type, None):
+            self._reports[_type] += 1
+
+        def resolve(self, _type, message=None):
+            stack = self._reports.pop(_type, 0)
+            if stack > 0 and message is not None:
                 renpy.notify(message)
 
 
     _ectx_main = _ErrorContext()
-    _ectx_opts = _ErrorContext(stack=True)
+    _ectx_opts = _ErrorContext(max_stack=-1)
