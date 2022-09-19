@@ -15,6 +15,7 @@ init 10 python in fom_presence:
 init -1000 python in fom_presence:
 
     import os
+    import datetime
 
 
     def _get_script_file(fallback=None, relative=False):
