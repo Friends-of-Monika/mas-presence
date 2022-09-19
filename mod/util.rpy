@@ -125,7 +125,7 @@ init -1000 python in fom_presence:
                 if ev_tup[0] == mas_calendar.CAL_TYPE_EV:
                     ev = mas_getEV(ev_key)
                     prompt = ev.prompt
-                    years = ev.years_param
+                    years = ev.years
                 else:
                     prompt = ev_tup[1]
                     years = ev_tup[2]
