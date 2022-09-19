@@ -13,6 +13,13 @@ init 80 python in fom_presence:
 
     _uservars = dict()
 
+    def _update_funcs():
+        _uservars.extend(dict(
+            lower=lambda s: s.lower(),
+            upper=lambda s: s.upper(),
+            decap=lambda s: _str_detitle(s)
+        ))
+
     def _update_loc_prompt():
         bg = mas_background.BACKGROUND_MAP[persistent._mas_current_background]
         _uservars["loc_prompt"] = renpy.substitute(bg.prompt)
@@ -29,8 +36,8 @@ init 80 python in fom_presence:
             _uservars["eve_key_{0}".format(suffix)] = next_eve[2]
 
     def _update_uservars():
+        _update_funcs
         _update_loc_prompt()
-
         _update_eve_remaining(1, "24h")
         _update_eve_remaining(3, "3d")
         _update_eve_remaining(7, "1w")
