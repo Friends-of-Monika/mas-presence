@@ -76,11 +76,11 @@ init 200 python in fom_presence_extensions:
         if next_eve is None:
             _vars["eve_days_{0}".format(suffix)] = None
             _vars["eve_prompt_{0}".format(suffix)] = None
-            _vars["eve_key_{0}".format(suffix) = None
+            _vars["eve_key_{0}".format(suffix)] = None
         else:
             _vars["eve_days_{0}".format(suffix)] = next_eve[0].days
             _vars["eve_prompt_{0}".format(suffix)] = next_eve[1]
-            _vars["eve_key_{0}".format(suffix) = next_eve[2]
+            _vars["eve_key_{0}".format(suffix)] = next_eve[2]
 
         return _vars
 
