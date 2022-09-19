@@ -20,17 +20,16 @@ init 50 python in fom_presence:
             self._max_stack = max_stack
 
         def report(self, _type, message):
-            stack = self._reports.get(_type, 0)
-            if stack <= self._max_stack or stack < 0:
+            if _type in self._reports:
+                stack = self._reports[_type]
+            else:
+                self._reports[_type] = 0
+                stack = 0
+
+            if stack <= self._max_stack or self._max_stack < 0:
                 renpy.notify(message)
 
-                if _type in self._reports:
-                    self._reports[_type] = 0
-
-            if stack == 0:
-                self._reports[_type] = 1
-            else:
-                self._reports[_type] += 1
+            self._reports[_type] += 1
 
         def resolve(self, _type, message=None):
             stack = self._reports.pop(_type, 0)
