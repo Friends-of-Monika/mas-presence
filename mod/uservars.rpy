@@ -16,13 +16,20 @@ init 80 python in fom_presence:
 
     def _expose_uservars():
         for key, value in _uservars.items():
-            if hasattr(store, key):
-                _uservars_temp[key] = getattr(store, key)
+            exists = hasattr(store, key)
+            if exists:
+                _uservars_temp[key] = (getattr(store, key), exists)
+            else:
+                _uservars_temp[key] = (None, exists)
             setattr(store, key, value)
 
     def _unexpose_uservars():
-        for key in list(_uservars_temp.keys()):
-            setattr(store, key, _uservars_temp.pop(key))
+        for key, exists in list(_uservars_temp.keys()):
+            if exists:
+                setattr(store, key, _uservars_temp.pop(key))
+            else:
+                _uservars_temp.pop(key)
+                delattr(store, key)
 
     def _uservars_eval(s):
         return eval(s, _uservars, store.__dict__)
