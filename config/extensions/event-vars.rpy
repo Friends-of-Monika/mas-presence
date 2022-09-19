@@ -1,4 +1,4 @@
-init 100 python fom_presence_extensions:
+init 100 python in fom_presence_extensions:
 
     import store
     from store import persistent, mas_background, fom_presence
