@@ -36,7 +36,7 @@ init 80 python in fom_presence:
             _uservars["eve_key_{0}".format(suffix)] = next_eve[2]
 
     def _update_uservars():
-        _update_funcs
+        _update_funcs()
         _update_loc_prompt()
         _update_eve_remaining(1, "24h")
         _update_eve_remaining(3, "3d")
