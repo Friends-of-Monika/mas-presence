@@ -13,8 +13,10 @@ version="$2"
 package="$(echo "$name" | tr "[:upper:]" "[:lower:]" | tr "[:blank:]" "-")"
 
 mkdir -p "$temp/game/Submods"
+mkdir -p "$temp/game/Submods/$name/config"
+
 cp -r "$dir/mod" "$temp/game/Submods/$name"
-cp -r "$dir/config" "$temp/game/Submods/$name/config"
+cp -r "$dir/config" "$temp/game/Submods/$name/config/maintained"
 cp -r "$dir/lib" "$temp/game/Submods/$name/lib"
 
 rm "$temp/game/Submods/$name/lib/README.txt"
