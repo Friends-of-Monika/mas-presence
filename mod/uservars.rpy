@@ -14,7 +14,7 @@ init 80 python in fom_presence:
     _uservars = dict()
 
     def _update_funcs():
-        _uservars.extend(dict(
+        _uservars.update(dict(
             lower=lambda s: s.lower(),
             upper=lambda s: s.upper(),
             decap=lambda s: _str_detitle(s)
