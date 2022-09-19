@@ -12,6 +12,28 @@ init 80 python in fom_presence:
     import datetime
 
     _uservars = dict()
+    _uservars_temp = dict()
+
+    def _expose_uservars():
+        for key, value in _uservars.items():
+            if hasattr(store, key):
+                _uservars_temp[key] = getattr(store, key)
+            setattr(store, key, value)
+
+    def _unexpose_uservars():
+        for key in list(_uservars_temp.keys()):
+            setattr(store, key, _uservars_temp.pop(key))
+
+    def _uservars_eval(s):
+        return eval(s, _uservars, store.__dict__)
+
+    def _uservars_subst(s):
+        try:
+            _expose_uservars()
+            return renpy.substitute(s, _uservars)
+        finally:
+            _unexpose_uservars()
+
 
     def _update_funcs():
         _uservars.update(dict(
@@ -19,6 +41,8 @@ init 80 python in fom_presence:
             upper=lambda s: s.upper(),
             decap=lambda s: _str_detitle(s)
         ))
+        _uservars.update(_uservars)
+
 
     def _update_loc_prompt():
         bg = mas_background.BACKGROUND_MAP[persistent._mas_current_background]
