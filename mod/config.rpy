@@ -64,6 +64,16 @@ init 90 python in fom_presence:
         return _dt_to_ts(persistent.sessions["current_session_start"])
     _timestamp_type["sessionstart"] = _Provider(_ts_session_start)
 
+    def _ts_upcoming_event_1h():
+        eve = _get_next_event(1)
+        if eve is None:
+            return None
+        if eve[0].total_seconds() > 3600:
+            return None
+        return int(time.time() + eve[0].total_seconds())
+    _timestamp_type["upcomingevent1h"] = _Provider(_ts_upcoming_event_1h)
+    # NOTE: Discord just won't render timestamps that exceed 1 hour.
+
 
     class Config(object):
         def __init__(self, parser):
@@ -141,7 +151,7 @@ init 90 python in fom_presence:
                     _configs.append((_file, Config.load_file(os.path.join(_dir, _file))))
 
                 except configparser.ParsingError as e:
-                    self._ectx.report(
+                    _presence.ectx.report(
                         _ERR_CFG,
                         "Some (or all) Presence Configs are invalid and could not "
                         "be loaded.\nSee details in log/submod_log.log"
@@ -157,7 +167,7 @@ init 90 python in fom_presence:
                     active.append(conf)
 
             except Exception as e:
-                self._ectx.report(
+                _presence.ectx.report(
                     _ERR_CFG,
                     "Some (or all) Presence Configs have invalid Condition "
                     "parameters and cannot be used.\nSee details in "

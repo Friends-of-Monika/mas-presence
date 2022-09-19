@@ -139,8 +139,10 @@ init 100 python in fom_presence:
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop")
     def _preloop():
+        _update_uservars()
+        _load_configs()
+
         if persistent._fom_presence_enabled:
-            _load_configs()
             _presence.connect()
 
 

@@ -27,7 +27,10 @@ init 50 python in fom_presence:
                 if _type in self._reports:
                     self._reports[_type] = 0
 
-            self._reports[_type] += 1
+            if stack == 0:
+                self._reports[_type] = 1
+            else:
+                self._reports[_type] += 1
 
         def resolve(self, _type, message=None):
             stack = self._reports.pop(_type, 0)

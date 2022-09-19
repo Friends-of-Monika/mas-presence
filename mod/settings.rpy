@@ -26,7 +26,7 @@ init 100:
 
                 textbutton "Reconnect":
                     selected False
-                    sensitive persistent._fom_presence_enabled
+                    sensitive fom_presence._presence.connected
                     action Function(fom_presence._sscr_reconnect)
                     hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
                     unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
@@ -53,7 +53,7 @@ init 100 python in fom_presence:
                 fom_presence._presence.disconnect()
 
             elif persistent._fom_presence_enabled and not fom_presence._presence.connected:
-                fom_presence._presence._reconnect()
+                fom_presence._presence.connect()
 
         finally:
             fom_presence._presence.ectx = _ectx_main

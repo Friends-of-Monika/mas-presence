@@ -5,6 +5,13 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
+init 10 python in fom_presence:
+
+    import store
+    from store import mas_calendar
+    from store import mas_getEV
+
+
 init -1000 python in fom_presence:
 
     import os
@@ -102,6 +109,33 @@ init -1000 python in fom_presence:
                 # Simply remove leading "game" item frm path parts.
                 parts.pop(0)
             return "/".join(parts)
+
+
+    def _str_detitle(s):
+        if len(s) == 0:
+            return s
+        return s[0].lower() + s[1:]
+
+
+    def _get_next_event(n_days):
+        cur = datetime.date.today()
+        for i in range(n_days):
+            ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
+            for ev_key, ev_tup in ev_dict.items():
+                if ev_tup[0] == mas_calendar.CAL_TYPE_EV:
+                    ev = mas_getEV(ev_key)
+                    prompt = ev.prompt
+                    years = ev.years_param
+                else:
+                    prompt = ev_tup[1]
+                    years = ev_tup[2]
+
+                if years is None or len(years) == 0 or cur.year in years:
+                    return cur - datetime.date.today(), prompt, ev_key
+
+            cur += datetime.timedelta(days=1)
+
+        return None
 
 
     class _Provider(object):
