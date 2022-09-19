@@ -24,11 +24,11 @@ init 80 python in fom_presence:
             setattr(store, key, value)
 
     def _unexpose_uservars():
-        for key, exists in list(_uservars_temp.keys()):
+        for key in list(_uservars_temp.keys()):
+            value, exists = _uservars_temp.pop(key)
             if exists:
-                setattr(store, key, _uservars_temp.pop(key))
+                setattr(store, key, value)
             else:
-                _uservars_temp.pop(key)
                 delattr(store, key)
 
     def _uservars_eval(s):
