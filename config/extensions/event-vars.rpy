@@ -56,7 +56,7 @@
 init 200 python in fom_presence_extensions:
 
     import store
-    from store import mas_background
+    from store import persistent, mas_background
 
 
     # LOCATION PROMPT VARIABLE
