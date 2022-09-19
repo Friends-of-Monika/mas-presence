@@ -150,7 +150,8 @@ init 90 python in fom_presence:
                 try:
                     _configs.append((_file, Config.load_file(os.path.join(_dir, _file))))
 
-                except configparser.ParsingError as e:
+                except Exception as e:
+                    _debug("Fail.")
                     _presence.ectx.report(
                         _ERR_CFG,
                         "Some (or all) Presence Configs are invalid and could not "
@@ -169,9 +170,8 @@ init 90 python in fom_presence:
             except Exception as e:
                 _presence.ectx.report(
                     _ERR_CFG,
-                    "Some (or all) Presence Configs have invalid Condition "
-                    "parameters and cannot be used.\nSee details in "
-                    "log/submod_log.log"
+                    "Some (or all) Presence Configs are invalid and could not "
+                    "be loaded.\nSee details in log/submod_log.log"
                 )
                 _error("Could not evaluate presence config condition in file {0}: {1}".format(_file, e))
 
