@@ -1,13 +1,10 @@
-# This Ren'Py script exists to provide additional functionality such as current
-# location prompt, upcoming event key IDs, prompts and day countdowns as well
-# as some utility functions that will also be exposed to global scope.
+# This Ren'Py script exists to provide upcoming event key IDs, prompts and day
+# countdowns as custom variables usable in condition expressions and
+# interpolations.
 #
 # Author: Herman S. <dreamscache.d@gmail.com>
 #
-# Full list of variables and functions follows:
 # Variables:
-#   loc_prompt - current location prompt (with variables interpolated.)
-#
 #   eve_days_24h - days until next calendar event within 24
 #     hours or None if there aren't any.
 #   eve_prompt_24h - prompt (with variables interpolated.) of next calendar
@@ -42,32 +39,12 @@
 #     within 1 year or None if there aren't any.
 #   eve_key_1y - key ID of next calendar event within 1 year or None if there
 #     aren't any.
-#
-# Functions:
-#
-#  upper(s) - transform a string into uppercase.
-#  lower(s) - transform a string into lowercase.
-#
-#  title(s) - transform a string into titlecase, make first character uppercase
-#    and leave all the other characters lowercase.
-#  decapitalize(s) - transform only the first character of a string to
-#   lowercase.
 
 init 200 python in fom_presence_extensions:
 
     import store
-    from store import persistent, mas_background
+    from store import fom_presence
 
-
-    # LOCATION PROMPT VARIABLE
-
-    def _fom_loc_prompt():
-        bg = mas_background.BACKGROUND_MAP[persistent._mas_current_background]
-        return renpy.substitute(bg.prompt)
-    cvars_add_var("loc_prompt", _fom_loc_prompt)
-
-
-    # UPCOMING CALENDAR EVENT VARIABLES
 
     def _fom_update_eve_vars(n_days, suffix):
         _vars = dict()
@@ -92,31 +69,5 @@ init 200 python in fom_presence_extensions:
         _vars.update(_fom_update_eve_vars(31, "1m"))
         _vars.update(_fom_update_eve_vars(365, "1y"))
         return _vars
+
     cvars_add_var_set(_fom_update_eve_vars_all)
-
-
-    # STRING FUNCTIONS
-
-    def _update_str_funcs():
-        _vars = dict()
-
-        def upper(s):
-            return s.upper()
-        _vars["upper"] = upper
-
-        def lower(s):
-            return s.lower()
-        _vars["lower"] = lower
-
-        def title(s):
-            return s.title()
-        _vars["title"] = title
-
-        def decapitalize(s):
-            if len(s) == 0:
-                return s
-            return s[0].lower() + s[1:]
-        _vars["decapitalize"] = decapitalize
-
-        return _vars
-    cvars_add_var_set(_update_str_funcs, loop=False)

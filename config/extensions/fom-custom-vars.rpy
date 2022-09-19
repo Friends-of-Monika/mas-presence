@@ -1,3 +1,23 @@
+# This Ren'Py script exists to provide custom variables framework that allows
+# registration of custom variables or variable sets in a convenient way.
+#
+# Author: Herman S. <dreamscache.d@gmail.com>
+#
+# Functions:
+#   cvars_add_var(name, supplier, loop=True) - register custom variable (or
+#     function that can be used in condition expressions or interpolations with
+#     name <name> and supplier function <supplier> that must take no arguments
+#     and must return value of this variable. If <loop> is True, then this
+#     variable will be updated on each loop and not just on startup.
+#   cvars_add_var_set(supplier, loop=True) - register custom variables set that
+#     is returned from <supplier> function that must take no arguments as
+#     dictionary of string keys and any type of values that correspond to custom
+#     variables names and values. If <loop> is True, then this variable set will
+#     be updated on each loop and not just on startup.
+#
+# Extensions relying on this extension must have init offset of value greater
+# than 100.
+
 init 100 python in fom_presence_extensions:
 
     import store
