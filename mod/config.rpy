@@ -44,7 +44,7 @@ init 90 python in fom_presence:
 
     def _subst_str_provider(s):
         def provide():
-            return _uservars_subst(s)
+            return renpy.substitute(s)
         return _Provider(provide)
 
 
@@ -164,7 +164,7 @@ init 90 python in fom_presence:
 
         for _file, conf in _configs:
             try:
-                if bool(_uservars_eval(conf.condition)):
+                if bool(eval(conf.condition, dict(), store.__dict__)):
                     active.append(conf)
 
             except Exception as e:
