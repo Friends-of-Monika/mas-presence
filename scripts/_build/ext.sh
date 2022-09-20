@@ -9,7 +9,6 @@ mkdir -p "$build"
 submod_name="$(perl -ne 'if (/^.*name="([^"]*)"/) { print $1; exit }' "$dir/mod/header.rpy")"
 
 find "$dir/config" -mindepth 1 -maxdepth 1 | while read -r ext; do
-echo "$ext"
     name="$(perl -ne 'if (/^.*name="([^"]*)"/) { print $1; exit }' "$ext/header.rpy")"
     version="$(perl -ne 'if (/^.*version="([^"]*)"/) { print $1; exit }' "$ext/header.rpy")"
     package="$(echo "$name" | tr "[:upper:]" "[:lower:]" | tr "[:blank:]" "-")"
