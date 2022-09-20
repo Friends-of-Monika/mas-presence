@@ -1,4 +1,4 @@
-<h1 align="center">🛰️ Discord Presense Submod</h1>
+<h1 align="center">🛰️ Discord Presence Submod</h1>
 <h3 align="center">Show everyone who's the person you're spending your time with~</h3>
 
 ## 🌟 Features
