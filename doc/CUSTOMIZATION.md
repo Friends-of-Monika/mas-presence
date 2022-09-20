@@ -25,12 +25,6 @@ presence configs from each other; however, config files must have one of the
 following extensions: `.cfg`, `.ini` or `.conf`, files with any other extensions
 will be ignored.
 
-*Note: in order to preserve user modifications and custom files after updates,
-**officially maintained** presence configs and extensions are stored under
-`maintained/` folder, and while you're absolutely free to wipe it out, it is
-recommended you at least leave `extensions/` folder as it contains official
-extensions that might be relied upon by other people's presence configs.*
-
 ### Conditions and priorities
 
 To reflect changes in game and let you display different activities based on
