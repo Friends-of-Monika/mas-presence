@@ -10,7 +10,10 @@ init -990 python:
         description="This submod provides simple pack of presence configs such "
                     "as day/night specific presence layouts, special events, "
                     "etc.",
-        version="1.0.0"
+        version="1.0.0",
+        dependencies={
+            "Base Extensions for Discord Presence Submod": (None, None)
+        },
     )
 
 init -989 python:

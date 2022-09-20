@@ -10,7 +10,10 @@ init -990 python:
         description="This submod provides Custom Variables framework as well "
                     "as string functions, location prompts, event prompts, "
                     "etc.",
-        version="1.0.0"
+        version="1.0.0",
+        dependencies={
+            "Discord Presence Submod": (None, None)
+        },
     )
 
 init -989 python:
