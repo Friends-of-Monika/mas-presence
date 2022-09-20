@@ -11,6 +11,7 @@ version="$(perl -ne 'if (/^.*version="([^"]*)"/) { print $1; exit }' "$dir/mod/h
 package="$(echo "$name" | tr "[:upper:]" "[:lower:]" | tr "[:blank:]" "-")"
 
 mkdir -p "$temp/game/Submods/$name"
+mkdir "$temp/game/Submods/$name/config"
 cp -r "$dir/mod"/* "$temp/game/Submods/$name"
 cp -r "$dir/lib" "$temp/game/Submods/$name"
 rm "$temp/game/Submods/$name/lib/README.txt"
