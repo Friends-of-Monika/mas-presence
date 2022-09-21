@@ -1,3 +1,5 @@
+#!/usr/bin/pwsh
+
 function New-TemporaryDirectory {
     $parent = [System.IO.Path]::GetTempPath()
     $name = [System.IO.Path]::GetRandomFileName()
