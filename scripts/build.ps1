@@ -1,4 +1,4 @@
-#!/usr/bin/pwsh
+#!/bin/pwsh
 
 function New-TemporaryDirectory {
     $parent = [System.IO.Path]::GetTempPath()
