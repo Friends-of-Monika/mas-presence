@@ -28,11 +28,11 @@ init 200 python in fom_presence_extensions:
             return s.title()
         _vars["title"] = title
 
-        def decapitalize(s):
+        def decap(s):
             if len(s) == 0:
                 return s
             return s[0].lower() + s[1:]
-        _vars["decapitalize"] = decapitalize
+        _vars["decap"] = decap
 
         return _vars
 
