@@ -17,6 +17,6 @@ init -989 python:
         store.sup_utils.SubmodUpdater(
             submod="Discord Presence Submod",
             user_name="friends-of-monika",
-            repository_name="presence-submod",
+            repository_name="mas-presence",
             extraction_depth=3
         )
