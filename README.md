@@ -58,7 +58,7 @@ gratitude to the following people:
 * [MaximusDecimus][4] &mdash; early access preview.
 * TheGuy &mdash; early access preview.
 
-[1]: doc/CUSTOMIZATION.md
+[1]: doc/CUSTOMIZING.md
 [2]: https://github.com/ImKventis
 [3]: https://github.com/my-otter-self
 [4]: https://github.com/AzhamProdLive
