@@ -33,6 +33,14 @@
     * Monika and her player's birthday special presence layouts
   * Contains custom variables extensions that can be used in text lines
 
+## ❓ Installing
+
+1. Go to [the latest release page][6] and scroll to Assets section.
+2. Download `discord-presence-submod-VERSION.zip` file.
+3. Drag and drop `game/` folder from it into your DDLC folder.
+   **NOTE:** make sure you don't drag it *into `game`*!
+4. You're all set!~
+
 ## 📚 Customization
 
 Discord Presence Submod is *infinitely* customizable with condition-driven
