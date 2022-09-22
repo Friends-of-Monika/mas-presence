@@ -1,6 +1,21 @@
 <h1 align="center">🛰️ Discord Presence Submod</h1>
 <h3 align="center">Show everyone who's the person you're spending your time with~</h3>
 
+<p align="center">
+  <a href="https://github.com/friends-of-monika/mas-presence/releases/latest">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/friends-of-monika/mas-presence">
+  </a>
+  <a href="https://github.com/friends-of-monika/mas-presence/releases">
+    <img alt="Release downloads" src="https://img.shields.io/github/downloads/friends-of-monika/mas-presence/total">
+  </a>
+  <a href="https://mon.icu/discord">
+    <img alt="Discord server" src="https://discordapp.com/api/guilds/970747033071804426/widget.png?style=shield">
+  </a>
+  <a href="https://github.com/friends-of-monika/mas-presence/blob/main/LICENSE.txt">
+    <img alt="MIT license badge" src="https://img.shields.io/badge/License-MIT-lightgrey.svg">
+  </a>
+</p>
+
 ## 🌟 Features
 
 * Simple and minimalistic yet extremely extensible configuration
