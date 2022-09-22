@@ -26,5 +26,17 @@ entire way presence configs are chosen or processed.
 
 Want to know how? Check out [customization guide][1]!
 
+## 🏅 Special thanks
+
+Discord Presence Submod authors, maintainers and contributors express their
+gratitude to the following people:
+* [Kventis][2] &mdash; Discord Rich Presence idea and [MAS RPC][5] submod.
+* [Otter][3] &mdash; early access preview.
+* [MaximusDecimus][4] &mdash; early access preview.
+* TheGuy &mdash; early access preview.
 
 [1]: doc/CUSTOMIZATION.md
+[2]: https://github.com/ImKventis
+[3]: https://github.com/my-otter-self
+[4]: https://github.com/AzhamProdLive
+[5]: https://github.com/ImKventis/MAS_RPC
