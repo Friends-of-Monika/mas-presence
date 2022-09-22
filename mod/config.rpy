@@ -23,7 +23,7 @@ init 90 python in fom_presence:
 
 
     def _get_conf_dir():
-        _file = _get_script_file(fallback="game/Submods/Discord Presence Submod")
+        _file = _get_script_file(fallback="game/Submods/Discord Presence Submod/config.rpy")
         return os.path.join("/".join(_file.split("/")[:-1]), "config")
 
     config_dir = _get_conf_dir()
