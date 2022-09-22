@@ -63,3 +63,4 @@ gratitude to the following people:
 [3]: https://github.com/my-otter-self
 [4]: https://github.com/AzhamProdLive
 [5]: https://github.com/ImKventis/MAS_RPC
+[6]: https://github.com/friends-of-monika/mas-presence/releases/latest
