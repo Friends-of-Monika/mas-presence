@@ -17,4 +17,4 @@ will override defaults.
 
 The config system is made to be simple but infinitely extensible, however if
 you're having trouble figuring out how to configure things, check out this page:
-https://github.com/Friends-of-Monika/mas-presence/blob/master/docs/CUSTOMIZING.txt
+https://github.com/Friends-of-Monika/mas-presence/blob/master/docs/CUSTOMIZING.md
