@@ -18,6 +18,7 @@ init 90 python in fom_presence:
 
     if sys.version_info.major == 2:
         import ConfigParser as configparser
+        import io
     else:
         import configparser
 
@@ -101,7 +102,8 @@ init 90 python in fom_presence:
         @staticmethod
         def load_file(path):
             c = configparser.ConfigParser()
-            c.read(path)
+            with _open_encoding(path, "r", encoding="utf-8") as f:
+                c.readfp(f, path.replace("\\", "/").split("/")[:-1])
             return Config(c)
 
         @property
