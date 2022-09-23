@@ -12,8 +12,8 @@ $Temp = New-TemporaryDirectory
 $Build = "$Dir\build"
 New-Item -ItemType Directory -Force -Path $Build | Out-Null
 
-$Name = Get-Content .\mod\header.rpy | Select-String '^\s*name="([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
-$Version = Get-Content .\mod\header.rpy | Select-String '^\s*version="([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+$Name = Get-Content $Dir\mod\header.rpy | Select-String '^\s*name="([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+$Version = Get-Content $Dir\mod\header.rpy | Select-String '^\s*version="([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
 $Package = $Name.ToLower() -Replace "\s", "-"
 
 $Mod = "$Temp\game\Submods"
