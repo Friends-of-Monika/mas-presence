@@ -101,7 +101,8 @@ init 90 python in fom_presence:
         @staticmethod
         def load_file(path):
             c = configparser.ConfigParser()
-            c.read(path)
+            with open(path, "r", encoding="utf-8") as f:
+                c.readfp(f, path.replace("\\", "/").split("/")[:-1])
             return Config(c)
 
         @property
