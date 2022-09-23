@@ -16,6 +16,8 @@ init -1000 python in fom_presence:
 
     import os
     import datetime
+    import io
+    import sys
 
 
     def _get_script_file(fallback=None, relative=False):
@@ -145,3 +147,11 @@ init -1000 python in fom_presence:
 
         def get(self, *args, **kwargs):
             return self._provide(*args, **kwargs)
+
+
+    if sys.version_info.major == 2:
+        def _open_encoding(path, mode, encoding="utf-8"):
+            return io.open(path, "r", encoding="utf-8")
+    else:
+        def _open_encoding(path, mode, encoding="utf-8"):
+            return open(path, "r", encoding="utf-8")
