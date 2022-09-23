@@ -16,6 +16,16 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/friends-of-monika/mas-presence">
+    <img alt="English version badge" src="https://img.shields.io/badge/🇬🇧_English-gray.svg">
+  </a>
+  <a href="https://github.com/MAS-Submod-MoyuTeam/mas-presence">
+    <img alt="English version badge" src="https://img.shields.io/badge/🇨🇳_Chinese-gray.svg">
+  </a>
+</p>
+
+
 ## 🌟 Features
 
 * Simple and minimalistic yet extremely extensible configuration
