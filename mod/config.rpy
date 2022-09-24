@@ -153,7 +153,6 @@ init 90 python in fom_presence:
                     _configs.append((_file, Config.load_file(os.path.join(_dir, _file))))
 
                 except Exception as e:
-                    _debug("Fail.")
                     _presence.ectx.report(
                         _ERR_CFG,
                         "Some (or all) Presence Configs are invalid and could not "
