@@ -140,6 +140,9 @@ init 90 python in fom_presence:
     _configs = list()
 
     def _load_configs():
+        global _configs
+        _configs = list()
+
         for _dir, _, files in os.walk(config_dir):
             for _file in files:
                 if not (
