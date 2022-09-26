@@ -150,7 +150,8 @@ init 90 python in fom_presence:
                     continue
 
                 try:
-                    _configs.append((_file, Config.load_file(os.path.join(_dir, _file))))
+                    _file = os.path.join(_dir, _file)
+                    _configs.append((_file, Config.load_file(_file)))
 
                 except Exception as e:
                     _presence.ectx.report(
@@ -158,7 +159,7 @@ init 90 python in fom_presence:
                         "Some (or all) Presence Configs are invalid and could not "
                         "be loaded.\nSee details in log/submod_log.log"
                     )
-                    _error("Could not load presence config from file {0}: {1}".format(_file, e))
+                    _error("Could not load presence config from file {0}: {1}".format(_file[len(config_dir) + 1:], e))
 
     def get_active_config():
         active = list()
@@ -174,7 +175,7 @@ init 90 python in fom_presence:
                     "Some (or all) Presence Configs are invalid and could not "
                     "be loaded.\nSee details in log/submod_log.log"
                 )
-                _error("Could not evaluate presence config condition in file {0}: {1}".format(_file, e))
+                _error("Could not evaluate presence config condition in file {0}: {1}".format(_file[len(config_dir) + 1:], e))
 
         if len(active) == 0:
             return None
