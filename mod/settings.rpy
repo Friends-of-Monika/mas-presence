@@ -86,5 +86,6 @@ init 100 python in fom_presence:
         try:
             fom_presence._presence.ectx = _ectx_opts
             _load_configs()
+            get_active_config()
         finally:
             fom_presence._presence.ectx = _ectx_main
