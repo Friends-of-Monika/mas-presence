@@ -82,7 +82,7 @@ init 90 python in fom_presence:
             compile(condition, "<string>", "eval")
             self.condition = condition
             self.priority = _get_conf_value(parser, "Presence", "Priority", int, 0)
-            self.dynamic = _get_conf_value(parser, "Presence", "Dynamic", _bool, False)
+            self.dynamic = _get_conf_value(parser, "Presence", "Dynamic", _bool, True)
 
             self.app_id = _get_conf_value(parser, "Client", "ApplicationID", int)
 
