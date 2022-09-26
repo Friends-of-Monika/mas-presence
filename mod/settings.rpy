@@ -18,7 +18,7 @@ init 100:
                 style_prefix "check"
                 box_wrap False
 
-                textbutton "Enabled":
+                textbutton "Enable":
                     selected persistent._fom_presence_enabled
                     action Function(fom_presence._sscr_toggle)
                     hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
