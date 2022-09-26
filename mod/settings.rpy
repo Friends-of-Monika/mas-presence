@@ -61,6 +61,9 @@ init 100 python in fom_presence:
     def _sscr_reconnect():
         try:
             fom_presence._presence.ectx = _ectx_opts
+            if _presence._curr_conf is None:
+                _presence.connect()
+            else:
             _presence._reconnect()
         finally:
             fom_presence._presence.ectx = _ectx_main
