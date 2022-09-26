@@ -18,18 +18,19 @@ init 100:
                 style_prefix "check"
                 box_wrap False
 
-                textbutton "Enable":
-                    selected persistent._fom_presence_enabled
-                    action Function(fom_presence._sscr_toggle)
-                    hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
-                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                vbox:
+                    textbutton "Enable":
+                        selected persistent._fom_presence_enabled
+                        action Function(fom_presence._sscr_toggle)
+                        hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
+                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
-                textbutton "Reconnect":
-                    selected False
-                    sensitive persistent._fom_presence_enabled
-                    action Function(fom_presence._sscr_reconnect)
-                    hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
-                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                    textbutton "Reconnect":
+                        selected False
+                        sensitive persistent._fom_presence_enabled
+                        action Function(fom_presence._sscr_reconnect)
+                        hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
+                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
                 vbox:
                     textbutton "Reload activity":
