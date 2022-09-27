@@ -138,14 +138,14 @@ init -1000 python in fom_presence:
                     sd = datetime.datetime.min
 
                 if years is None or len(years) == 0 or cur.year in years:
-                    events.append((cur - datetime.date.today(), sd, prompt, ev_key))
+                    events.append((cur - datetime.date.today(), prompt, ev_key, sd))
 
             cur += datetime.timedelta(days=1)
 
         if len(events) == 0:
             return None
 
-        events.sort(key=lambda it: it[1])
+        events.sort(key=lambda it: it[3])
         return events[0]
 
 
