@@ -215,7 +215,7 @@ init -100 python in fom_presence:
                 return _WindowsSocket(io.open(sock_path, "w+b"))
 
             except IOError as e:
-                if e.errno != errno.EINVAL:
+                if e.errno not in (errno.EINVAL, errno.ENOENT):
                     # Only raise if we're not trying to open closed or
                     # nonexistent pipe for reading and writing.
                     raise
