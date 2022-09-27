@@ -18,25 +18,33 @@ init 100:
                 style_prefix "check"
                 box_wrap False
 
-                textbutton "Enabled":
-                    selected persistent._fom_presence_enabled
-                    action Function(fom_presence._sscr_toggle)
-                    hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
-                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                vbox:
+                    textbutton "Enable":
+                        selected persistent._fom_presence_enabled
+                        action Function(fom_presence._sscr_toggle)
+                        hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
+                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
-                textbutton "Reconnect":
-                    selected False
-                    sensitive fom_presence._presence.connected
-                    action Function(fom_presence._sscr_reconnect)
-                    hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
-                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                    textbutton "Reconnect":
+                        selected False
+                        sensitive persistent._fom_presence_enabled
+                        action Function(fom_presence._sscr_reconnect)
+                        hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
+                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
-                textbutton "Reload":
-                    selected False
-                    sensitive fom_presence._presence.connected
-                    action Function(fom_presence._sscr_reload)
-                    hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
-                    unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                vbox:
+                    textbutton "Reload activity":
+                        selected False
+                        sensitive fom_presence._presence.connected
+                        action Function(fom_presence._sscr_reload)
+                        hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
+                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+
+                    textbutton "Reload configs":
+                        selected False
+                        action Function(fom_presence._sscr_reload_configs)
+                        hovered SetField(scr_tooltip, "value", "Reload presence configs.")
+                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
 
 
 init 100 python in fom_presence:
@@ -61,7 +69,10 @@ init 100 python in fom_presence:
     def _sscr_reconnect():
         try:
             fom_presence._presence.ectx = _ectx_opts
-            _presence._reconnect()
+            if _presence._curr_conf is None:
+                _presence.connect()
+            else:
+                _presence._reconnect()
         finally:
             fom_presence._presence.ectx = _ectx_main
 
@@ -69,5 +80,13 @@ init 100 python in fom_presence:
         try:
             fom_presence._presence.ectx = _ectx_opts
             _presence._reload()
+        finally:
+            fom_presence._presence.ectx = _ectx_main
+
+    def _sscr_reload_configs():
+        try:
+            fom_presence._presence.ectx = _ectx_opts
+            _load_configs()
+            get_active_config()
         finally:
             fom_presence._presence.ectx = _ectx_main

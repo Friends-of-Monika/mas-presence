@@ -121,6 +121,8 @@ init -1000 python in fom_presence:
 
 
     def _get_next_event(n_days):
+        events = list()
+
         cur = datetime.date.today()
         for i in range(n_days):
             ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
@@ -129,16 +131,26 @@ init -1000 python in fom_presence:
                     ev = mas_getEV(ev_key)
                     prompt = ev.prompt
                     years = ev.years
+                    sd = ev.start_date
+
+                    if sd is not None and sd < datetime.datetime.now():
+                        continue
+
                 else:
                     prompt = ev_tup[1]
                     years = ev_tup[2]
+                    sd = datetime.datetime.min
 
                 if years is None or len(years) == 0 or cur.year in years:
-                    return cur - datetime.date.today(), prompt, ev_key
+                    events.append((cur - datetime.date.today(), prompt, ev_key, sd))
 
             cur += datetime.timedelta(days=1)
 
-        return None
+        if len(events) == 0:
+            return None
+
+        events.sort(key=lambda it: it[3])
+        return events[0]
 
 
     class _Provider(object):
