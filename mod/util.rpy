@@ -132,6 +132,10 @@ init -1000 python in fom_presence:
                     prompt = ev.prompt
                     years = ev.years
                     sd = ev.start_date
+
+                    if sd is not None and sd < datetime.datetime.now():
+                        continue
+
                 else:
                     prompt = ev_tup[1]
                     years = ev_tup[2]
