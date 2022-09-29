@@ -8,11 +8,14 @@
   <a href="https://github.com/friends-of-monika/mas-presence/releases">
     <img alt="Release downloads" src="https://img.shields.io/github/downloads/friends-of-monika/mas-presence/total">
   </a>
+  <a href="https://github.com/friends-of-monika/mas-presence/blob/main/LICENSE.txt">
+    <img alt="MIT license badge" src="https://img.shields.io/badge/License-MIT-lightgrey.svg">
+  </a>
   <a href="https://mon.icu/discord">
     <img alt="Discord server" src="https://discordapp.com/api/guilds/970747033071804426/widget.png?style=shield">
   </a>
-  <a href="https://github.com/friends-of-monika/mas-presence/blob/main/LICENSE.txt">
-    <img alt="MIT license badge" src="https://img.shields.io/badge/License-MIT-lightgrey.svg">
+  <a href="https://ko-fi.com/Y8Y15BC52">
+    <img alt="Ko-fi badge" src="https://ko-fi.com/img/githubbutton_sm.svg" height="20">
   </a>
 </p>
 
