@@ -562,6 +562,20 @@ init -100 python in fom_presence:
                 activity=activity.to_dict()
             ))
 
+    class ClearActivity(Command):
+        """
+        ClearActivity is a command to clear Rich Presence activity.
+        """
+
+        def __init__(self):
+            """
+            Creates a new instance of ClearActivity command.
+            """
+
+            super(ClearActivity, self).__init__(CMD_SET_ACTIVITY, dict(
+                pid=os.getpid()
+            ))
+
 
     ## Pre-initialized packets that can be reused without any changes.
 
@@ -771,6 +785,15 @@ init -100 python in fom_presence:
             """
 
             self.call(SetActivity(activity))
+
+        def clear_activity(self):
+            """
+            A convenience method for sending ClearActivity command packet.
+
+            RAISES:
+                CallError:
+                    If error occurs.
+            """
 
         def ping(self):
             """
