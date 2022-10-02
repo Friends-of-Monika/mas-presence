@@ -4,23 +4,29 @@
 # This file is part of Discord Presence Submod (see link below):
 # https://github.com/friends-of-monika/discord-presence-submod
 
-init -100 python in fom_presence:
+
+init -100 python in fom_presence_logging:
 
     import store
     from store.mas_submod_utils import submod_log
 
 
-    _LOG_PREFIX = "[Discord Presence Submod] "
+    class Logger(object):
+        def __init__(self, prefix, upstream):
+            self._prefix = prefix
+            self._upstream = logger
+
+        def debug(self, message):
+            self._upstream.debug(self._prefix + message)
+
+        def info(self, message):
+            self._upstream.info(self._prefix + message)
+
+        def warning(self, message):
+            self._upstream.warn(self._prefix + message)
+
+        def error(self, message):
+            self._upstream.error(self._prefix + message)
 
 
-    def _debug(msg):
-        submod_log.debug(_LOG_PREFIX + msg)
-
-    def _info(msg):
-        submod_log.info(_LOG_PREFIX + msg)
-
-    def _warn(msg):
-        submod_log.warn(_LOG_PREFIX + msg)
-
-    def _error(msg):
-        submod_log.error(_LOG_PREFIX + msg)
+    LOGGER = Logger(prefix="[Discord Presence Submod] ", upstream=submod_log)
