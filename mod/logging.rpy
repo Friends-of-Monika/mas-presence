@@ -5,7 +5,7 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init -100 python in fom_presence_logging:
+init -100 python in _fom_presence_logging:
 
     import store
     from store.mas_submod_utils import submod_log
