@@ -5,14 +5,14 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init 10 python in fom_presence:
+init 10 python in _fom_presence_utils:
 
     import store
     from store import mas_calendar
     from store import mas_getEV
 
 
-init -1000 python in fom_presence:
+init -1000 python in _fom_presence_utils:
 
     import os
     import datetime
@@ -20,7 +20,7 @@ init -1000 python in fom_presence:
     import sys
 
 
-    def _get_script_file(fallback=None, relative=False):
+    def get_script_file(fallback=None, relative=False):
         """
         Uses internal Ren'Py function renpy.get_filename_line() to locate
         current script file and get its location, accounting for potential
@@ -151,19 +151,3 @@ init -1000 python in fom_presence:
 
         events.sort(key=lambda it: it[3])
         return events[0]
-
-
-    class _Provider(object):
-        def __init__(self, provide_func):
-            self._provide = provide_func
-
-        def get(self, *args, **kwargs):
-            return self._provide(*args, **kwargs)
-
-
-    if sys.version_info.major == 2:
-        def _open_encoding(path, mode, encoding="utf-8"):
-            return io.open(path, "r", encoding="utf-8")
-    else:
-        def _open_encoding(path, mode, encoding="utf-8"):
-            return open(path, "r", encoding="utf-8")
