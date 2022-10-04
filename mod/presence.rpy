@@ -10,7 +10,7 @@
 # - https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md
 # - https://discord.com/developers/docs/rich-presence/how-to
 
-init -100 python in fom_presence:
+init -100 python in _fom_presence_discord:
 
     # Imports
 
