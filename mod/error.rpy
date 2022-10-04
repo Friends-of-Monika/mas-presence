@@ -7,12 +7,10 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init -90 python in fom_presence_error:
-
-    import store.fom_presence_logging as log
-
+init -90 python in _fom_presence_error:
 
     class ErrorContext(object):
+
         def __init__(self, logger):
             self._logger = logger
             self._errors = dict()
@@ -42,6 +40,7 @@ init -90 python in fom_presence_error:
             return error
 
     class _Error(object):
+
         def __init__(
             self,
             context,
