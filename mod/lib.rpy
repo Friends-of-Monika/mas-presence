@@ -5,7 +5,7 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init -999 python in fom_presence:
+init -999 python in _fom_presence_lib:
 
     import sys
 
