@@ -55,9 +55,7 @@ label friends_of_monika_discord_presence_submod_v0_2_0(version="v0_2_0"):
                 return os.path.join("/".join(_file.split("/")[:-1]), "lib")
 
             lib_dir = _get_lib_dir()
-            files = os.listdir(lib_dir)
-            os.mkdir(os.path.join(lib_dir, "py2"))
-            for _file in files:
+            for _file in os.listdir(lib_dir):
                 if _file == "py2":
                     continue
                 os.rename(os.path.join(lib_dir, _file), os.path.join(lib_dir, "py2", _file))
