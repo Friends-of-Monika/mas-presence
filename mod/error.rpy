@@ -10,6 +10,7 @@
 init -90 python in _fom_presence_error:
 
     import store
+
     from store import _fom_presence_logging as logging
 
     import contextlib

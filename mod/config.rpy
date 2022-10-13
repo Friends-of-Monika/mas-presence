@@ -11,6 +11,7 @@ default persistent._fom_presence_enabled = True
 init 90 python in _fom_presence_config:
 
     import store
+
     from store import persistent
     from store import _fom_presence as mod
     from store import _fom_presence_discord as discord

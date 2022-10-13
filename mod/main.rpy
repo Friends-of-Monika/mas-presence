@@ -9,7 +9,9 @@
 init 100 python in _fom_presence:
 
     import store
+
     from store import persistent
+
     from store import _fom_presence_config as config
     from store import _fom_presence_error as error
     from store import _fom_presence_discord as discord

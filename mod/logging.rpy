@@ -8,6 +8,7 @@
 init -100 python in _fom_presence_logging:
 
     import store
+
     from store.mas_submod_utils import submod_log
 
 

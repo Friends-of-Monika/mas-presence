@@ -50,6 +50,7 @@ init 100:
 init 100 python in _fom_presence_settings:
 
     import store
+
     from store import persistent
     from store import _fom_presence as mod
     from store import _fom_presence_config as config

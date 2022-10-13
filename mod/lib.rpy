@@ -8,6 +8,7 @@
 init -99 python in _fom_presence_lib:
 
     import store
+
     from store import _fom_presence as mod
 
     import os

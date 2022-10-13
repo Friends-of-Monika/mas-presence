@@ -8,6 +8,7 @@
 init 10 python in _fom_presence_util:
 
     import store
+
     from store import mas_calendar
     from store import mas_getEV
 

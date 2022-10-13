@@ -31,6 +31,7 @@ init -989 python:
 init -100 python in _fom_presence:
 
     import store
+
     from store import _fom_presence_util as util
 
     import os
