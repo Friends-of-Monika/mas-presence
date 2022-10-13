@@ -58,6 +58,8 @@ label friends_of_monika_discord_presence_submod_v0_2_0(version="v0_2_0"):
             files = os.listdir(lib_dir)
             os.mkdir(os.path.join(lib_dir, "py2"))
             for _file in files:
+                if _file == "py2":
+                    continue
                 os.rename(os.path.join(lib_dir, _file), os.path.join(lib_dir, "py2", _file))
 
         # Run migration function and delete it not to litter the global scope.
