@@ -116,12 +116,46 @@ init -1000 python in _fom_presence_util:
 
 
     def str_detitle(s):
+        """
+        Does the opposite of str.title() by converting first character in string
+        to its lowercase counterpart. If empty string is passed, an empty string
+        is returned correspondingly.
+
+        IN:
+            s -> str:
+                String to convert first character of to lowercase.
+
+        OUT:
+            str:
+                String with first charater in lowercase, or an empty string if
+                an empty string is passed.
+        """
+
         if len(s) == 0:
             return s
         return s[0].lower() + s[1:]
 
 
     def get_next_event(n_days):
+        """
+        Finds the closest calendar event within next N days. If none found,
+        returns None.
+
+        IN:
+            n_days -> int:
+                Amount of days to scan for upcoming events.
+
+        OUT:
+            Tuple of the following items:
+                [0]: amount of days until upcoming event
+                [1]: event prompt
+                [2]: event key
+                [3]: event starting date
+
+            None:
+                If no upcoming events were found.
+        """
+
         events = list()
 
         cur = datetime.date.today()
