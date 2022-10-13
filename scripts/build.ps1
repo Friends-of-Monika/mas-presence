@@ -22,7 +22,7 @@ $Mod = "$Mod\$Name"
 
 Copy-Item -Recurse $Dir\mod $Mod
 Copy-Item -Recurse $Dir\lib $Mod
-Remove-Item $Mod\lib\README.txt
+Remove-Item $Mod\lib\py2\README.txt
 Copy-Item -Recurse $Dir\config $Mod\config
 
 Compress-Archive -Update -Path $Temp\game -DestinationPath $Build\$Package-$Version.zip
