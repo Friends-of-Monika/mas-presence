@@ -47,11 +47,8 @@ init 100 python in _fom_presence:
 
         def __init__(self, logger):
             self._logger = logger
-
             self._connected = False
             self._config = None
-
-            self._socket = None
             self._clients = dict()
 
         @property
@@ -64,11 +61,11 @@ init 100 python in _fom_presence:
                 if self._config is None:
                     return
 
-            client_with_data = self._get_or_connect_client(self._config)
-            if client_with_data is None:
+            client_with_socket = self._get_or_connect_client(self._config)
+            if client_with_socket is None:
                 return
 
-            client, _ = client_with_data
+            client, _ = client_with_socket
             client.set_activity(self._config.to_activity())
             self._connected = True
 
@@ -76,7 +73,6 @@ init 100 python in _fom_presence:
             for app_id in list(self._clients.keys()):
                 client, _ = self._clients.pop(app_id)
                 client.disconnect()
-            self._socket = None
             self._connected = False
 
         def update(self):
@@ -85,54 +81,47 @@ init 100 python in _fom_presence:
                 return
 
             prev_config, self._config = self._config, config.get_active_config()
-            if not self._config:
-                prev_client.clear_activity()
-                return
-
             if prev_config.app_id != self._config.app_id:
-                prev_client = self._get_or_connect_client(prev_config)
+                prev_client, _ = self._get_or_connect_client(prev_config)
                 prev_client.clear_activity()
 
-            client_with_data = self._get_or_connect_client(self._config)
-            if client_with_data is None:
+            client_with_socket = self._get_or_connect_client(self._config)
+            if client_with_socket is None:
                 return
 
             try:
-                client, _ = client_with_data
+                client, _ = client_with_socket
                 client.set_activity(self._config.to_activity())
                 _ERROR_CLIENT_ACTIVITY.resolve()
             except (discord.ProtocolError, discord.CallError) as e:
                 _ERROR_CLIENT_ACTIVITY.report(e)
 
         def _get_or_connect_client(self, config):
-            socket = self._get_or_connect_socket()
+            socket = self._connect_socket()
             if socket is None:
                 return
 
-            client_with_data = self._clients.get(config.app_id)
-            if client_with_data is None:
+            client_with_socket = self._clients.get(config.app_id)
+            if client_with_socket is None:
                 try:
                     client = discord.Client(socket)
-                    data = client.handshake(config.app_id)
+                    client.handshake(config.app_id)
                 except discord.ProtocolError as e:
                     _ERROR_CLIENT_CONNECTION.report(config.app_id, e)
                     return None
 
-                self._clients[config.app_id] = (client, data)
-                return client, data
+                self._clients[config.app_id] = (client, socket)
+                return client, socket
 
             _ERROR_CLIENT_CONNECTION.resolve()
-            return client_with_data
+            return client_with_socket
 
-        def _get_or_connect_socket(self):
-            if self._socket is None:
-                self._socket = discord.get_rpc_socket()
-                if self._socket is None:
-                    _ERROR_SOCKET_UNAVAILABLE.report()
-                return self._socket
-
-            _ERROR_SOCKET_UNAVAILABLE.resolve()
-            return self._socket
+        def _connect_socket(self):
+            socket = discord.get_rpc_socket()
+            if socket is None:
+                _ERROR_SOCKET_UNAVAILABLE.report()
+                return None
+            return socket
 
         def _check_all_connections(self):
             for client, _ in self._clients.values():
