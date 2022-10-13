@@ -5,14 +5,14 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init 10 python in _fom_presence_utils:
+init 10 python in _fom_presence_util:
 
     import store
     from store import mas_calendar
     from store import mas_getEV
 
 
-init -1000 python in _fom_presence_utils:
+init -1000 python in _fom_presence_util:
 
     import os
     import datetime
@@ -114,13 +114,13 @@ init -1000 python in _fom_presence_utils:
             return "/".join(parts)
 
 
-    def _str_detitle(s):
+    def str_detitle(s):
         if len(s) == 0:
             return s
         return s[0].lower() + s[1:]
 
 
-    def _get_next_event(n_days):
+    def get_next_event(n_days):
         events = list()
 
         cur = datetime.date.today()

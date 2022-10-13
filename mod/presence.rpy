@@ -45,6 +45,11 @@ init -100 python in _fom_presence_discord:
     EVT_ERROR = "ERROR"
 
 
+    ## Socket timeout
+
+    SOCK_TIMEOUT = 1
+
+
     # Platform-specific approaches to IPC sockets (Unix) and pipes (Windows.)
 
     ## Unix domain socket
@@ -78,6 +83,7 @@ init -100 python in _fom_presence_discord:
                     Array, list or any other iterable containing bytes to write.
             """
 
+            self._sock.settimeout(SOCK_TIMEOUT)
             self._sock.sendall(data)
 
         def read(self, size):
@@ -93,6 +99,7 @@ init -100 python in _fom_presence_discord:
                     Read buffer of data (size of 0 to size.)
             """
 
+            self._sock.settimeout(SOCK_TIMEOUT)
             return self._sock.recv(size)
 
         def close(self):
@@ -126,12 +133,15 @@ init -100 python in _fom_presence_discord:
         # Now having base path, construct path to IPC socket. Try up to 10
         # possible paths (they all have suffix number.)
         for i in range(10):
-            sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
+            try:
+                sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
+                if os.path.exists(sock_path):
+                    sock = socket.socket(socket.AF_UNIX)
+                    sock.connect(sock_path)
+                    return _UnixSocket(sock)
 
-            if os.path.exists(sock_path):
-                sock = socket.socket(socket.AF_UNIX)
-                sock.connect(sock_path)
-                return _UnixSocket(sock)
+            except IOError:
+                pass
 
         return None
 

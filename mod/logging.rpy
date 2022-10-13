@@ -14,7 +14,7 @@ init -100 python in _fom_presence_logging:
     class Logger(object):
         def __init__(self, prefix, upstream):
             self._prefix = prefix
-            self._upstream = logger
+            self._upstream = upstream
 
         def debug(self, message):
             self._upstream.debug(self._prefix + message)
@@ -29,4 +29,4 @@ init -100 python in _fom_presence_logging:
             self._upstream.error(self._prefix + message)
 
 
-    LOGGER = Logger(prefix="[Discord Presence Submod] ", upstream=submod_log)
+    DEFAULT = Logger(prefix="[Discord Presence Submod] ", upstream=submod_log)

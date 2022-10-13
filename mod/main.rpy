@@ -5,156 +5,170 @@
 # This file is part of Discord Presence Submod (see link below):
 # https://github.com/friends-of-monika/discord-presence-submod
 
-init 100 python in fom_presence:
+
+init 100 python in _fom_presence:
+
+    import store
+    from store import persistent
+    from store import _fom_presence_config as config
+    from store import _fom_presence_error as error
+    from store import _fom_presence_discord as discord
+    from store import _fom_presence_logging as logging
+
+
+    _ERROR_SOCKET_UNAVAILABLE = error.Error(
+        log_message_report="Could not establish connection with Discord RPC socket.",
+        log_message_resolve="Established connection with Discord RPC socket."
+    )
+
+    _ERROR_CLIENT_CONNECTION = error.Error(
+        log_message_report="Could not connect to Discord RPC with application ID {0}: {1}",
+        log_message_resolve="Connection with Discord established.",
+        ui_message_report="Could not establish connection with Discord. It is most likely rate limited,\n"
+                          "for more details see log/submod_log.log.",
+        ui_message_resolve="Connection with Discord established."
+    )
+
+    _ERROR_CLIENT_PINGING = error.Error(
+        log_message_report="Connection with Discord lost: could not ping client {0}: {1}",
+        log_message_resolve="Re-established connection with Discord.",
+        ui_message_report="Connection with Discord lost. Trying to re-establish it...",
+        ui_message_resolve="Connection with Discord re-established."
+    )
+
+    _ERROR_CLIENT_ACTIVITY = error.Error(
+        log_message_report="Could not set activity: {0}",
+        ui_message_report="Could not set Rich Presence activity.\n"
+                          "For more details see log/submod_log.log"
+    )
+
 
     class _PresenceController(object):
-        def __init__(self):
-            self.ectx = _ectx_main
-            self._client = None
+
+        def __init__(self, logger):
+            self._logger = logger
+
             self._connected = False
-            self._curr_conf = None
+            self._config = None
+
+            self._socket = None
+            self._clients = dict()
 
         @property
         def connected(self):
             return self._connected
 
         def connect(self):
-            if self._curr_conf is None:
-                # On first loop, this may be None, so we need to pick it.
-                self._curr_conf = get_active_config()
-                if self._curr_conf is None:
-                    # Refuse to connect if there isn't an active config.
+            if self._config is None:
+                self._config = config.get_active_config()
+                if self._config is None:
                     return
 
-            self._reconnect()
-
-        def _reconnect(self):
-            if self._connected:
-                self.disconnect()
-            self._connect_with_conf(self._curr_conf)
-
-        def _connect_with_conf(self, conf):
-            try:
-                cl = Client(get_rpc_socket())
-                cl.handshake(conf.app_id)
-
-                self.ectx.resolve(_ERR_PIN)
-                self.ectx.resolve(
-                    _ERR_CON, "Connection with Discord established."
-                )
-
-            except (CallError, ProtocolError) as e:
-                _error("Could not connect to Discord RPC: {0}".format(e))
-                self.ectx.report(
-                    _ERR_CON,
-                    "Could not connect to Discord. Ensure it is running or\n"
-                    "see details in log/submod_log.log"
-                )
-
+            client_with_data = self._get_or_connect_client(self._config)
+            if client_with_data is None:
                 return
 
-            try:
-                cl.set_activity(conf.activity)
-
-                self.ectx.resolve(
-                    _ERR_ACT, "Presence activity updated."
-                )
-
-            except Exception as e:
-                _error("Could not set initial activity: {0}".format(e))
-                self.ectx.report(
-                    _ERR_ACT,
-                    "Could not update presence activity. Ensure Discord is "
-                    "running or\nsee details in log/submod_log.log"
-                )
-
-                return
-
-            self._client = cl
+            client, _ = client_with_data
+            client.set_activity(self._config.to_activity())
             self._connected = True
 
         def disconnect(self):
-            try:
-                # Try disconnecting, we may ignore the errors though.
-                self._client.disconnect()
-
-            except IOError as e:
-                _error("Could not safely close Discord RPC: {0}".format(e))
-
-            # We closed the connection from our side anyway, consider it closed.
+            for app_id in list(self._clients.keys()):
+                client, _ = self._clients.pop(app_id)
+                client.disconnect()
+            self._socket = None
             self._connected = False
 
         def update(self):
-            self._curr_conf = get_active_config()
-            if self._curr_conf is None:
-                # Disconnect if there isn't any active configs anymore.
+            if not self._check_all_connections():
                 self.disconnect()
                 return
 
-            self._reload()
+            prev_config, self._config = self._config, config.get_active_config()
+            if not self._config:
+                prev_client.clear_activity()
+                return
 
-        def _reload(self):
-            self._update_with_conf(self._curr_conf)
+            if prev_config.app_id != self._config.app_id:
+                prev_client = self._get_or_connect_client(prev_config)
+                prev_client.clear_activity()
 
-        def _update_with_conf(self, conf):
-            try:
-                self._client.ping()
-
-                self.ectx.resolve(
-                    _ERR_PIN, "Connection with Discord re-established."
-                )
-
-            except (CallError, IOError) as e:
-                _error("Discord RPC is not responding: {0}".format(e))
-                self.ectx.report(
-                    _ERR_PIN,
-                    "Discord is not responding. Ensure it is running or\n"
-                    "see details in log/submod_log.log"
-                )
-
-                self.disconnect()
+            client_with_data = self._get_or_connect_client(self._config)
+            if client_with_data is None:
                 return
 
             try:
-                self._client.set_activity(conf.activity)
+                client, _ = client_with_data
+                client.set_activity(self._config.to_activity())
+                _ERROR_CLIENT_ACTIVITY.resolve()
+            except (discord.ProtocolError, discord.CallError) as e:
+                _ERROR_CLIENT_ACTIVITY.report(e)
 
-                self.ectx.resolve(
-                    _ERR_ACT, "Presence activity updated."
-                )
+        def _get_or_connect_client(self, config):
+            socket = self._get_or_connect_socket()
+            if socket is None:
+                return
 
-            except Exception as e:
-                _error("Could not set Rich Presence activity: {0}".format(e))
-                self.ectx.report(
-                    _ERR_ACT,
-                    "Could not update presence activity. Ensure Discord is "
-                    "running or\nsee details in log/submod_log.log"
-                )
+            client_with_data = self._clients.get(config.app_id)
+            if client_with_data is None:
+                try:
+                    client = discord.Client(socket)
+                    data = client.handshake(config.app_id)
+                except discord.ProtocolError as e:
+                    _ERROR_CLIENT_CONNECTION.report(config.app_id, e)
+                    return None
+
+                self._clients[config.app_id] = (client, data)
+                return client, data
+
+            _ERROR_CLIENT_CONNECTION.resolve()
+            return client_with_data
+
+        def _get_or_connect_socket(self):
+            if self._socket is None:
+                self._socket = discord.get_rpc_socket()
+                if self._socket is None:
+                    _ERROR_SOCKET_UNAVAILABLE.report()
+                return self._socket
+
+            _ERROR_SOCKET_UNAVAILABLE.resolve()
+            return self._socket
+
+        def _check_all_connections(self):
+            for client, _ in self._clients.values():
+                try:
+                    client.ping()
+                except discord.ProtocolError as e:
+                    _ERROR_CLIENT_PINGING.report(app_id, e)
+                    return False
+
+            _ERROR_CLIENT_PINGING.resolve()
+            return True
 
 
-    _presence = _PresenceController()
+    presence = _PresenceController(logging.DEFAULT)
 
 
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop")
-    def _preloop():
-        _load_configs()
-
+    def on_preloop():
         if persistent._fom_presence_enabled:
-            _presence.connect()
+            config.reload_configs()
+            presence.connect()
 
 
     # Runs approximately once per 5 seconds while not in dialogue.
     @store.mas_submod_utils.functionplugin("ch30_loop")
-    def _loop():
+    def on_loop():
         if persistent._fom_presence_enabled:
-            if _presence.connected:
-                _presence.update()
+            if presence.connected:
+                presence.update()
             else:
-                _presence.connect()
+                presence.connect()
 
 
     # Runs on exit.
     @store.mas_submod_utils.functionplugin("exit")
-    def _exit():
-        if _presence.connected:
-            _presence.disconnect()
+    def ons_exit():
+        if presence.connected:
+            presence.disconnect()

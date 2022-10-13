@@ -7,10 +7,15 @@
 
 default persistent._fom_presence_enabled = True
 
-init 90 python in fom_presence:
+
+init 90 python in _fom_presence_config:
 
     import store
     from store import persistent
+    from store import _fom_presence as mod
+    from store import _fom_presence_discord as discord
+    from store import _fom_presence_error as error
+    from store import _fom_presence_logging as logging
 
     import sys
     import os
@@ -23,95 +28,123 @@ init 90 python in fom_presence:
         import configparser
 
 
-    def _get_conf_dir():
-        _file = _get_script_file(fallback="game/Submods/Discord Presence Submod/config.rpy")
-        return os.path.join("/".join(_file.split("/")[:-1]), "config")
+    # Errors
 
-    config_dir = _get_conf_dir()
+    _ERROR_CONFIG_LOADING = error.Error(
+        log_message_report="Could not load presence config from file {0}: {1}",
+        ui_message_report="Some (or all) Presence Configs are invalid and could not be loaded. They most likely have\n"
+                          "invalid syntax or condition, for more details see log/submod_log.log"
+    )
 
 
-    def _get_conf_value(parser, section, value, deserializer=str, default=None):
-        try:
-            return deserializer(parser.get(section, value, raw=True))
-        except (configparser.NoOptionError, configparser.NoSectionError) as e:
-            return default
+    # Supplier and related functions and constructors
 
-    def _bool(s):
-        if s.lower() in ("true", "yes", "y"):
-            return True
-        return False
+    class _Supplier(object):
+        def __init__(self, provide_func):
+            self._provide = provide_func
 
-    _none_provider = _Provider(lambda: None)
+        def get(self, *args, **kwargs):
+            return self._provide(*args, **kwargs)
 
-    def _subst_str_provider(s):
-        def provide():
+    _none_supplier = _Supplier(lambda: None)
+
+    def _substitute_supplier(s):
+        def supply():
             return renpy.substitute(s)
-        return _Provider(provide)
+        return _Supplier(supply)
 
 
-    _timestamp_type = dict()
 
-    def _dt_to_ts(dt):
+    # Timestamps and related functions and variables
+
+    def _datetime_to_int(dt):
         return int(time.mktime(dt.timetuple()) + dt.microsecond / 1000000.0)
 
-    def _parse_ts_provider(s):
-        return _timestamp_type.get(s.lower())
 
-    def _ts_none():
-        return None
-    _timestamp_type["none"] = _Provider(_ts_none)
+    _timestamps_db = dict()
+    _timestamps_db["none"] = _none_supplier
 
-    def _ts_session_start():
-        return _dt_to_ts(persistent.sessions["current_session_start"])
-    _timestamp_type["sessionstart"] = _Provider(_ts_session_start)
+    def _parse_ts_supplier(s):
+        return _timestamps_db.get(s.lower())
 
-    def _ts_upcoming_event_1h():
+    def _timestamp_session_start():
+        return _datetime_to_int(persistent.sessions["current_session_start"])
+    _timestamps_db["sessionstart"] = _Supplier(_timestamp_session_start)
+
+    def _timestamp_upcoming_event_1h():
+        # NOTE: Discord just won't render timestamps that exceed 1 hour.
         eve = _get_next_event(1)
         if eve is None:
             return None
         if eve[0].total_seconds() > 3600:
             return None
         return int(time.time() + eve[0].total_seconds())
-    _timestamp_type["upcomingevent1h"] = _Provider(_ts_upcoming_event_1h)
-    # NOTE: Discord just won't render timestamps that exceed 1 hour.
+    _timestamps_db["upcomingevent1h"] = _Supplier(_timestamp_upcoming_event_1h)
 
+
+    # ConfigParser wrapper and related functions and classes
+
+    def _parse_bool(s):
+        if s.lower() in ("true", "yes", "y"):
+            return True
+        return False
+
+    if sys.version_info.major == 2:
+        def _open_with_encoding(path, mode, encoding="utf-8"):
+            return io.open(path, "r", encoding="utf-8")
+    else:
+        def _open_with_encoding(path, mode, encoding="utf-8"):
+            return open(path, "r", encoding="utf-8")
+
+    class _ParserWrapper(object):
+        def __init__(self, parser):
+            self._parser = parser
+
+        def get_value(self, section, value, deserializer=str, default=None):
+            try:
+                return deserializer(self._parser.get(section, value, raw=True))
+            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                return default
+
+
+    # Config object and related functions and variables
 
     class Config(object):
         def __init__(self, parser):
-            condition = _get_conf_value(parser, "Presence", "Condition")
+            condition = parser.get_value("Presence", "Condition")
             compile(condition, "<string>", "eval")
             self.condition = condition
-            self.priority = _get_conf_value(parser, "Presence", "Priority", int, 0)
-            self.dynamic = _get_conf_value(parser, "Presence", "Dynamic", _bool, True)
 
-            self.app_id = _get_conf_value(parser, "Client", "ApplicationID", int)
+            self.priority = parser.get_value("Presence", "Priority", int, 0)
+            self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
 
-            self.details = _get_conf_value(parser, "Activity", "Details", _subst_str_provider, _none_provider)
-            self.state = _get_conf_value(parser, "Activity", "State", _subst_str_provider, _none_provider)
+            self.app_id = parser.get_value("Client", "ApplicationID", int)
 
-            self.large_image = _get_conf_value(parser, "Assets", "LargeImage")
-            self.large_text = _get_conf_value(parser, "Assets", "LargeText", _subst_str_provider, _none_provider)
-            self.small_image = _get_conf_value(parser, "Assets", "SmallImage")
-            self.small_text = _get_conf_value(parser, "Assets", "SmallText", _subst_str_provider, _none_provider)
+            self.details = parser.get_value("Activity", "Details", _substitute_supplier, _none_supplier)
+            self.state = parser.get_value("Activity", "State", _substitute_supplier, _none_supplier)
 
-            self.start_ts = _get_conf_value(parser, "Timestamps", "Start", _parse_ts_provider, _none_provider)
-            self.stop_ts = _get_conf_value(parser, "Timestamps", "End", _parse_ts_provider, _none_provider)
+            self.large_image = parser.get_value("Assets", "LargeImage")
+            self.large_text = parser.get_value("Assets", "LargeText", _substitute_supplier, _none_supplier)
+            self.small_image = parser.get_value("Assets", "SmallImage")
+            self.small_text = parser.get_value("Assets", "SmallText", _substitute_supplier, _none_supplier)
+
+            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, _none_supplier)
+            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, _none_supplier)
 
             self._activity = None
 
         @staticmethod
-        def load_file(path):
+        def from_file(path):
             c = configparser.ConfigParser()
-            with _open_encoding(path, "r", encoding="utf-8") as f:
+            with _open_with_encoding(path, "r", encoding="utf-8") as f:
                 c.readfp(f, path.replace("\\", "/").split("/")[:-1])
-            return Config(c)
+            return Config(_ParserWrapper(c))
 
-        @property
-        def activity(self):
+        def to_activity(self):
             if self._activity is not None:
                 return self._activity
 
-            a = Activity()
+            a = discord.Activity()
 
             if self.state is not None:
                 a.state = self.state.get()
@@ -137,13 +170,13 @@ init 90 python in fom_presence:
             return a
 
 
+    _config_dir = os.path.join(mod.basedir, "config")
     _configs = list()
 
-    def _load_configs():
-        global _configs
-        _configs = list()
+    def reload_configs():
+        del _configs[:]
 
-        for _dir, _, files in os.walk(config_dir):
+        for _dir, _, files in os.walk(_config_dir):
             for _file in files:
                 if not (
                     _file.endswith(".ini") or
@@ -154,15 +187,9 @@ init 90 python in fom_presence:
 
                 try:
                     _file = os.path.join(_dir, _file)
-                    _configs.append((_file, Config.load_file(_file)))
-
+                    _configs.append((_file, Config.from_file(_file)))
                 except Exception as e:
-                    _presence.ectx.report(
-                        _ERR_CFG,
-                        "Some (or all) Presence Configs are invalid and could not "
-                        "be loaded.\nSee details in log/submod_log.log"
-                    )
-                    _error("Could not load presence config from file {0}: {1}".format(_file[len(config_dir) + 1:], e))
+                    _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
     def get_active_config():
         active = list()
@@ -171,14 +198,8 @@ init 90 python in fom_presence:
             try:
                 if bool(eval(conf.condition, dict(), store.__dict__)):
                     active.append(conf)
-
             except Exception as e:
-                _presence.ectx.report(
-                    _ERR_CFG,
-                    "Some (or all) Presence Configs are invalid and could not "
-                    "be loaded.\nSee details in log/submod_log.log"
-                )
-                _error("Could not evaluate presence config condition in file {0}: {1}".format(_file[len(config_dir) + 1:], e))
+                _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
         if len(active) == 0:
             return None
