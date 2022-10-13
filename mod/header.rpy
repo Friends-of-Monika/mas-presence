@@ -12,7 +12,11 @@ init -990 python in mas_submod_utils:
         version="0.1.2",
         settings_pane="fom_presence_settings_pane",
         version_updates={
-            "friends_of_monika_discord_presence_submod_v0_0_1": "friends_of_monika_discord_presence_submod_v0_0_2"
+            "friends_of_monika_discord_presence_submod_v0_0_1": "friends_of_monika_discord_presence_submod_v0_0_2",
+            "friends_of_monika_discord_presence_submod_v0_0_2": "friends_of_monika_discord_presence_submod_v0_0_3",
+            "friends_of_monika_discord_presence_submod_v0_0_3": "friends_of_monika_discord_presence_submod_v0_0_4",
+            "friends_of_monika_discord_presence_submod_v0_0_4": "friends_of_monika_discord_presence_submod_v0_1_2",
+            "friends_of_monika_discord_presence_submod_v0_1_2": "friends_of_monika_discord_presence_submod_v0_2_0"
         }
     )
 

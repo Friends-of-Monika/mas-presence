@@ -16,4 +16,4 @@ init -99 python in _fom_presence_lib:
 
 
     if sys.version_info.major == 2:
-        sys.path.append(os.path.join(mod.basedir, "lib"))
+        sys.path.append(os.path.join(mod.basedir, "lib", "py2"))
