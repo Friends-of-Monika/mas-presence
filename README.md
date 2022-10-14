@@ -44,6 +44,8 @@
     * Dedicated presence config for anniversary dates
     * Time of day-based presences
     * Monika and her player's birthday special presence layouts
+    * Support for Be Right Back in base game as well as custom be right backs
+      from submods from my-otter-self, geneTechnician and other people!
   * Contains custom variables extensions that can be used in text lines
 
 ## ❓ Installing
