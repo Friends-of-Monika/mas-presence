@@ -32,9 +32,8 @@ init 90 python in _fom_presence_config:
     # Errors
 
     _ERROR_CONFIG_LOADING = error.Error(
-        log_message_report="Could not load presence config from file {0}: {1}",
-        ui_message_report="Some (or all) Presence Configs are invalid and could not be loaded. They most likely have\n"
-                          "invalid syntax or condition, for more details see log/submod_log.log"
+        log_message_report="Could not load presence config from file {0}: {1}.",
+        ui_message_report="Could not load some presence configs, see log/submod_log.log."
     )
 
 

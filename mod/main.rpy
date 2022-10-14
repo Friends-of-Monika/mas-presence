@@ -24,15 +24,21 @@ init 100 python in _fom_presence:
     )
 
     _ERROR_CLIENT_CONNECTION = error.Error(
-        log_message_report="Could not connect to Discord RPC with application ID {0}: {1}",
+        log_message_report="Could not connect to Discord RPC with application ID {0}: {1}.",
         log_message_resolve="Connection with Discord established.",
-        ui_message_report="Could not establish connection with Discord. It is most likely rate limited,\n"
-                          "for more details see log/submod_log.log.",
+        ui_message_report="Could not establish connection with Discord.",
+        ui_message_resolve="Connection with Discord established."
+    )
+
+    _ERROR_CLIENT_TIMEOUT = error.Error(
+        log_message_report="Timed out while connecting to Discord RPC with application ID {0}: {1}.",
+        log_message_resolve="Connection with Discord established.",
+        ui_message_report="Discord RPC socket does not respond, this usually means you have tried to reconnect too quickly.",
         ui_message_resolve="Connection with Discord established."
     )
 
     _ERROR_CLIENT_PINGING = error.Error(
-        log_message_report="Connection with Discord lost: could not ping client {0}: {1}",
+        log_message_report="Connection with Discord lost: could not ping client {0}: {1}.",
         log_message_resolve="Re-established connection with Discord.",
         ui_message_report="Connection with Discord lost. Trying to re-establish it...",
         ui_message_resolve="Connection with Discord re-established."
@@ -40,8 +46,7 @@ init 100 python in _fom_presence:
 
     _ERROR_CLIENT_ACTIVITY = error.Error(
         log_message_report="Could not set activity: {0}",
-        ui_message_report="Could not set Rich Presence activity.\n"
-                          "For more details see log/submod_log.log"
+        ui_message_report="Could not set Rich Presence activity."
     )
 
 
