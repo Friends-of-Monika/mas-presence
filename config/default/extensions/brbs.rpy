@@ -15,6 +15,6 @@ init 200 python in fom_presence_extensions:
 
 
     def _fom_brb_label():
-        return mas_idle_mailbox.read(MASIdleMailbox.IDLE_MODE_CB_LABEL)
+        return mas_idle_mailbox.read(store.MASIdleMailbox.IDLE_MODE_CB_LABEL)
 
     cvars_add_var("brb_label", _fom_brb_label)
