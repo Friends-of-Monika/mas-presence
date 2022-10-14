@@ -21,13 +21,14 @@ init 100:
                 vbox:
                     textbutton "Enable":
                         selected persistent._fom_presence_enabled
+                        sensitive not (_fom_presence.presence.timeout_locked and not _fom_presence.presence.connected)
                         action Function(_fom_presence_settings.toggle)
                         hovered SetField(tooltip, "value", "Enable Discord Rich Presence.")
                         unhovered SetField(tooltip, "value", tooltip.default)
 
                     textbutton "Reconnect":
                         selected False
-                        sensitive persistent._fom_presence_enabled
+                        sensitive persistent._fom_presence_enabled and not _fom_presence.presence.timeout_locked
                         action Function(_fom_presence_settings.reconnect)
                         hovered SetField(tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
                         unhovered SetField(tooltip, "value", tooltip.default)

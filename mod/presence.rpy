@@ -130,18 +130,24 @@ init -100 python in _fom_presence_discord:
             "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"
         ]) if path is not None] or ["/tmp"])[0]
 
+        # NOTE: It is incredibly rare that this is set to 0 or 1.
         # Now having base path, construct path to IPC socket. Try up to 10
         # possible paths (they all have suffix number.)
         for i in range(10):
-            try:
-                sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
-                if os.path.exists(sock_path):
-                    sock = socket.socket(socket.AF_UNIX)
+            sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
+            if os.path.exists(sock_path):
+                sock = socket.socket(socket.AF_UNIX)
+                sock.settimeout(SOCK_TIMEOUT)
+
+                try:
                     sock.connect(sock_path)
                     return _UnixSocket(sock)
-
-            except IOError:
-                pass
+                except socket.error as e:
+                    # If socket is unhandled (somehow), connection will fail
+                    # with ECONNREFUSED. Just pass this socket and try to find
+                    # another one.
+                    if e.errno != errno.ECONNREFUSED:
+                        raise
 
         return None
 

@@ -17,28 +17,34 @@ init 100 python in _fom_presence:
     from store import _fom_presence_discord as discord
     from store import _fom_presence_logging as logging
 
+    import socket
+    import datetime
 
-    _ERROR_SOCKET_UNAVAILABLE = error.Error(
-        log_message_report="Could not establish connection with Discord RPC socket.",
-        log_message_resolve="Established connection with Discord RPC socket."
+
+    _TIMEOUT_LOCK_DURATION = datetime.timedelta(seconds=45)
+
+
+    _ERROR_SOCKET_NOT_FOUND = error.Error(
+        log_message_report="Could not connect to Discord Rich Presence. Is Discord running locally (not in browser?)",
+        log_message_resolve="Established connection with Discord Rich Presence."
     )
 
     _ERROR_CLIENT_CONNECTION = error.Error(
-        log_message_report="Could not connect to Discord RPC with application ID {0}: {1}.",
+        log_message_report="Could not connect to Discord RPC: {0}.",
         log_message_resolve="Connection with Discord established.",
         ui_message_report="Could not establish connection with Discord.",
         ui_message_resolve="Connection with Discord established."
     )
 
     _ERROR_CLIENT_TIMEOUT = error.Error(
-        log_message_report="Timed out while connecting to Discord RPC with application ID {0}: {1}.",
+        log_message_report="Timed out while connecting to Discord RPC.",
         log_message_resolve="Connection with Discord established.",
-        ui_message_report="Discord RPC socket does not respond, this usually means you have tried to reconnect too quickly.",
+        ui_message_report="Discord connection timed out, further attempts will be possible in {0} seconds.".format(int(_TIMEOUT_LOCK_DURATION.total_seconds())),
         ui_message_resolve="Connection with Discord established."
     )
 
     _ERROR_CLIENT_PINGING = error.Error(
-        log_message_report="Connection with Discord lost: could not ping client {0}: {1}.",
+        log_message_report="Connection with Discord lost: {0}.",
         log_message_resolve="Re-established connection with Discord.",
         ui_message_report="Connection with Discord lost. Trying to re-establish it...",
         ui_message_resolve="Connection with Discord re-established."
@@ -57,10 +63,15 @@ init 100 python in _fom_presence:
             self._connected = False
             self._config = None
             self._clients = dict()
+            self._lock_conn_until = None
 
         @property
         def connected(self):
             return self._connected
+
+        @property
+        def timeout_locked(self):
+            return self._lock_conn_until is not None and self._lock_conn_until > datetime.datetime.now()
 
         def connect(self):
             if self._config is None:
@@ -88,9 +99,14 @@ init 100 python in _fom_presence:
                 return
 
             prev_config, self._config = self._config, config.get_active_config()
+            if self._config is None:
+                client.clear_activity()
+                return
+
             if prev_config.app_id != self._config.app_id:
                 prev_client, _ = self._get_or_connect_client(prev_config)
                 prev_client.clear_activity()
+                return
 
             client_with_socket = self._get_or_connect_client(self._config)
             if client_with_socket is None:
@@ -104,38 +120,63 @@ init 100 python in _fom_presence:
                 _ERROR_CLIENT_ACTIVITY.report(e)
 
         def _get_or_connect_client(self, config):
-            socket = self._connect_socket()
-            if socket is None:
+            rpc_socket = self._connect_socket()
+            if rpc_socket is None:
                 return
 
             client_with_socket = self._clients.get(config.app_id)
             if client_with_socket is None:
                 try:
-                    client = discord.Client(socket)
+                    client = discord.Client(rpc_socket)
                     client.handshake(config.app_id)
-                except discord.ProtocolError as e:
-                    _ERROR_CLIENT_CONNECTION.report(config.app_id, e)
+                    _ERROR_CLIENT_TIMEOUT.resolve()
+                    _ERROR_CLIENT_CONNECTION.resolve()
+                    self._set_timeout_lock(False)
+                except (discord.ProtocolError, discord.CallError) as e:
+                    if isinstance(e, discord.ProtocolError) and isinstance(e.args[0], socket.timeout):
+                        _ERROR_CLIENT_TIMEOUT.report()
+                        self._set_timeout_lock(True)
+                    else:
+                        _ERROR_CLIENT_CONNECTION.report(e)
                     return None
 
-                self._clients[config.app_id] = (client, socket)
-                return client, socket
+                self._clients[config.app_id] = (client, rpc_socket)
+                return client, rpc_socket
 
-            _ERROR_CLIENT_CONNECTION.resolve()
             return client_with_socket
 
         def _connect_socket(self):
-            socket = discord.get_rpc_socket()
-            if socket is None:
-                _ERROR_SOCKET_UNAVAILABLE.report()
+            if self.timeout_locked:
                 return None
-            return socket
+
+            try:
+                rpc_socket = discord.get_rpc_socket()
+                if socket is None:
+                    _ERROR_SOCKET_NOT_FOUND.report()
+                    return None
+
+                _ERROR_SOCKET_NOT_FOUND.resolve()
+                _ERROR_CLIENT_TIMEOUT.resolve()
+                self._set_timeout_lock(False)
+                return rpc_socket
+
+            except socket.timeout as e:
+                self._set_timeout_lock(True)
+                _ERROR_CLIENT_TIMEOUT.report()
+                return None
+
+        def _set_timeout_lock(self, lock):
+            if lock:
+                self._lock_conn_until = datetime.datetime.now() + _TIMEOUT_LOCK_DURATION
+            else:
+                self._lock_conn_until = None
 
         def _check_all_connections(self):
             for client, _ in self._clients.values():
                 try:
                     client.ping()
                 except discord.ProtocolError as e:
-                    _ERROR_CLIENT_PINGING.report(app_id, e)
+                    _ERROR_CLIENT_PINGING.report(e)
                     return False
 
             _ERROR_CLIENT_PINGING.resolve()
@@ -150,6 +191,7 @@ init 100 python in _fom_presence:
     def on_preloop():
         if persistent._fom_presence_enabled:
             config.reload_configs()
+        if not presence.timeout_locked:
             presence.connect()
 
 
@@ -159,7 +201,7 @@ init 100 python in _fom_presence:
         if persistent._fom_presence_enabled:
             if presence.connected:
                 presence.update()
-            else:
+            elif not presence.timeout_locked:
                 presence.connect()
 
 

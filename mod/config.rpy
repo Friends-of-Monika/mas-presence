@@ -403,7 +403,10 @@ init 90 python in _fom_presence_config:
 
                 try:
                     _file = os.path.join(_dir, _file)
-                    _configs.append((_file, Config.from_file(_file)))
+                    config = Config.from_file(_file)
+                    eval(config.condition, dict(), store.__dict__)
+
+                    _configs.append((_file, config))
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
