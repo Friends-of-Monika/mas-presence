@@ -63,7 +63,7 @@ init 100 python in fom_presence_extensions:
                     _cvars_export_var_set(supplier())
 
             except Exception as e:
-                with temporary_context(error.EXTENSIONS_CONTEXT):
+                with error.temporary_context(error.EXTENSIONS_CONTEXT):
                     _ERROR_VAR_UPDATING.report(name, e)
 
 
