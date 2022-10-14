@@ -4,6 +4,7 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 init -990 python in mas_submod_utils:
+
     Submod(
         author="Friends of Monika",
         name="Discord Presence Submod",
@@ -11,11 +12,17 @@ init -990 python in mas_submod_utils:
         version="0.2.0",
         settings_pane="fom_presence_settings_pane",
         version_updates={
-            "friends_of_monika_discord_presence_submod_v0_0_1": "friends_of_monika_discord_presence_submod_v0_0_2"
+            "friends_of_monika_discord_presence_submod_v0_0_1": "friends_of_monika_discord_presence_submod_v0_0_2",
+            "friends_of_monika_discord_presence_submod_v0_0_2": "friends_of_monika_discord_presence_submod_v0_0_3",
+            "friends_of_monika_discord_presence_submod_v0_0_3": "friends_of_monika_discord_presence_submod_v0_0_4",
+            "friends_of_monika_discord_presence_submod_v0_0_4": "friends_of_monika_discord_presence_submod_v0_1_2",
+            "friends_of_monika_discord_presence_submod_v0_1_2": "friends_of_monika_discord_presence_submod_v0_2_0"
         }
     )
 
+
 init -989 python:
+
     if store.mas_submod_utils.isSubmodInstalled("Submod Updater Plugin"):
         store.sup_utils.SubmodUpdater(
             submod="Discord Presence Submod",
@@ -23,3 +30,17 @@ init -989 python:
             repository_name="mas-presence",
             extraction_depth=3
         )
+
+
+init -100 python in _fom_presence:
+
+    import store
+
+    from store import _fom_presence_util as util
+
+    import os
+
+
+    basedir = os.path.join(renpy.config.basedir, *util.get_script_file(
+        fallback="game/Submods/Discord Presence Submod/config.rpy"
+    ).split("/")[:-1])

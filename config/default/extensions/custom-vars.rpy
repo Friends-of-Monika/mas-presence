@@ -21,7 +21,15 @@
 init 100 python in fom_presence_extensions:
 
     import store
-    from store import fom_presence
+    from store import _fom_presence_logging as logging
+    from store import _fom_presence_error as error
+
+    _ERROR_VAR_UPDATING = error.Error(
+        log_message_report=(
+            "[Custom Variables] Could not update custom variable {0}: {1}"
+        )
+    )
+
 
     _CVARS_SINGLE = 0
     _CVARS_SET = 1
@@ -54,10 +62,8 @@ init 100 python in fom_presence_extensions:
                     _cvars_export_var_set(supplier())
 
             except Exception as e:
-                fom_presence._error((
-                    "[Custom Variables] Could not update custom variable {0}: "
-                    "{1}"
-                ).format(name, e))
+                with temporary_context(error.EXTENSIONS_CONTEXT):
+                    _ERROR_VAR_UPDATING.report(name, e)
 
 
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=-10)

@@ -7,7 +7,7 @@
 init 100:
 
     screen fom_presence_settings_pane:
-        $ scr_tooltip = renpy.get_screen("submods", "screens").scope["tooltip"]
+        $ tooltip = renpy.get_screen("submods", "screens").scope["tooltip"]
 
         vbox:
             box_wrap False
@@ -21,72 +21,61 @@ init 100:
                 vbox:
                     textbutton "Enable":
                         selected persistent._fom_presence_enabled
-                        action Function(fom_presence._sscr_toggle)
-                        hovered SetField(scr_tooltip, "value", "Enable Discord Rich Presence.")
-                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                        sensitive not (_fom_presence.presence.timeout_locked and not _fom_presence.presence.connected)
+                        action Function(_fom_presence_settings.toggle)
+                        hovered SetField(tooltip, "value", "Enable Discord Rich Presence.")
+                        unhovered SetField(tooltip, "value", tooltip.default)
 
                     textbutton "Reconnect":
                         selected False
-                        sensitive persistent._fom_presence_enabled
-                        action Function(fom_presence._sscr_reconnect)
-                        hovered SetField(scr_tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
-                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                        sensitive persistent._fom_presence_enabled and not _fom_presence.presence.timeout_locked
+                        action Function(_fom_presence_settings.reconnect)
+                        hovered SetField(tooltip, "value", "Forcibly reconnect to Discord Rich Presence.")
+                        unhovered SetField(tooltip, "value", tooltip.default)
 
                 vbox:
                     textbutton "Reload activity":
                         selected False
-                        sensitive fom_presence._presence.connected
-                        action Function(fom_presence._sscr_reload)
-                        hovered SetField(scr_tooltip, "value", "Forcibly reload presence activity.")
-                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                        sensitive _fom_presence.presence.connected
+                        action Function(_fom_presence_settings.reload_activity)
+                        hovered SetField(tooltip, "value", "Forcibly reload presence activity.")
+                        unhovered SetField(tooltip, "value", tooltip.default)
 
                     textbutton "Reload configs":
                         selected False
-                        action Function(fom_presence._sscr_reload_configs)
-                        hovered SetField(scr_tooltip, "value", "Reload presence configs.")
-                        unhovered SetField(scr_tooltip, "value", scr_tooltip.default)
+                        action Function(_fom_presence_settings.reload_configs)
+                        hovered SetField(tooltip, "value", "Reload presence configs.")
+                        unhovered SetField(tooltip, "value", tooltip.default)
 
 
-init 100 python in fom_presence:
+init 100 python in _fom_presence_settings:
 
     import store
-    from store import persistent, fom_presence
 
-    def _sscr_toggle():
-        try:
-            fom_presence._presence.ectx = _ectx_opts
+    from store import persistent
+    from store import _fom_presence as mod
+    from store import _fom_presence_config as config
+    from store import _fom_presence_error as error
 
+
+    def toggle():
+        with error.temporary_context(error.OPTIONS_CONTEXT):
             persistent._fom_presence_enabled = not persistent._fom_presence_enabled
-            if not persistent._fom_presence_enabled and fom_presence._presence.connected:
-                fom_presence._presence.disconnect()
+            if not persistent._fom_presence_enabled and mod.presence.connected:
+                mod.presence.disconnect()
+            elif persistent._fom_presence_enabled and not mod.presence.connected:
+                mod.presence.connect()
 
-            elif persistent._fom_presence_enabled and not fom_presence._presence.connected:
-                fom_presence._presence.connect()
+    def reconnect():
+        with error.temporary_context(error.OPTIONS_CONTEXT):
+            if mod.presence.connected:
+                mod.presence.disconnect()
+            mod.presence.connect()
 
-        finally:
-            fom_presence._presence.ectx = _ectx_main
+    def reload_activity():
+        with error.temporary_context(error.OPTIONS_CONTEXT):
+            mod.presence.update()
 
-    def _sscr_reconnect():
-        try:
-            fom_presence._presence.ectx = _ectx_opts
-            if _presence._curr_conf is None:
-                _presence.connect()
-            else:
-                _presence._reconnect()
-        finally:
-            fom_presence._presence.ectx = _ectx_main
-
-    def _sscr_reload():
-        try:
-            fom_presence._presence.ectx = _ectx_opts
-            _presence._reload()
-        finally:
-            fom_presence._presence.ectx = _ectx_main
-
-    def _sscr_reload_configs():
-        try:
-            fom_presence._presence.ectx = _ectx_opts
-            _load_configs()
-            get_active_config()
-        finally:
-            fom_presence._presence.ectx = _ectx_main
+    def reload_configs():
+        with error.temporary_context(error.OPTIONS_CONTEXT):
+            config.reload_configs()

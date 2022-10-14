@@ -10,7 +10,7 @@
 # - https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md
 # - https://discord.com/developers/docs/rich-presence/how-to
 
-init -100 python in fom_presence:
+init -100 python in _fom_presence_discord:
 
     # Imports
 
@@ -43,6 +43,11 @@ init -100 python in fom_presence:
 
     EVT_READY = "READY"
     EVT_ERROR = "ERROR"
+
+
+    ## Socket timeout
+
+    SOCK_TIMEOUT = 1
 
 
     # Platform-specific approaches to IPC sockets (Unix) and pipes (Windows.)
@@ -78,6 +83,7 @@ init -100 python in fom_presence:
                     Array, list or any other iterable containing bytes to write.
             """
 
+            self._sock.settimeout(SOCK_TIMEOUT)
             self._sock.sendall(data)
 
         def read(self, size):
@@ -93,6 +99,7 @@ init -100 python in fom_presence:
                     Read buffer of data (size of 0 to size.)
             """
 
+            self._sock.settimeout(SOCK_TIMEOUT)
             return self._sock.recv(size)
 
         def close(self):
@@ -123,15 +130,24 @@ init -100 python in fom_presence:
             "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"
         ]) if path is not None] or ["/tmp"])[0]
 
+        # NOTE: It is incredibly rare that this is set to 0 or 1.
         # Now having base path, construct path to IPC socket. Try up to 10
         # possible paths (they all have suffix number.)
         for i in range(10):
             sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
-
             if os.path.exists(sock_path):
                 sock = socket.socket(socket.AF_UNIX)
-                sock.connect(sock_path)
-                return _UnixSocket(sock)
+                sock.settimeout(SOCK_TIMEOUT)
+
+                try:
+                    sock.connect(sock_path)
+                    return _UnixSocket(sock)
+                except socket.error as e:
+                    # If socket is unhandled (somehow), connection will fail
+                    # with ECONNREFUSED. Just pass this socket and try to find
+                    # another one.
+                    if e.errno != errno.ECONNREFUSED:
+                        raise
 
         return None
 
