@@ -2,6 +2,7 @@
 # variable usable in condition expressions and interpolations.
 #
 # Author: Herman S. <dreamscache.d@gmail.com>
+# Since: 0.1.2
 #
 # Variables:
 #   wth_prompt - current weather prompt (with variables interpolated.)

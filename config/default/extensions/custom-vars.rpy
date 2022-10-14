@@ -2,6 +2,7 @@
 # registration of custom variables or variable sets in a convenient way.
 #
 # Author: Herman S. <dreamscache.d@gmail.com>
+# Since: 0.0.1
 #
 # Functions:
 #   cvars_add_var(name, supplier, loop=True) - register custom variable (or

@@ -3,6 +3,7 @@
 # interpolations.
 #
 # Author: Herman S. <dreamscache.d@gmail.com>
+# Since: 0.0.1
 #
 # Variables:
 #   eve_days_24h - days until next calendar event within 24

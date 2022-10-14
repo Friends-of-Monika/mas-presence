@@ -2,6 +2,7 @@
 # variable usable in condition expressions and interpolations.
 #
 # Author: Herman S. <dreamscache.d@gmail.com>
+# Since: 0.0.1
 #
 # Variables:
 #   loc_prompt - current location prompt (with variables interpolated.)
