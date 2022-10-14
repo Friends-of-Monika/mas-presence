@@ -2,6 +2,7 @@
 # registration of custom variables or variable sets in a convenient way.
 #
 # Author: Herman S. <dreamscache.d@gmail.com>
+# Since: 0.0.1
 #
 # Functions:
 #   cvars_add_var(name, supplier, loop=True) - register custom variable (or
@@ -21,7 +22,15 @@
 init 100 python in fom_presence_extensions:
 
     import store
-    from store import fom_presence
+    from store import _fom_presence_logging as logging
+    from store import _fom_presence_error as error
+
+    _ERROR_VAR_UPDATING = error.Error(
+        log_message_report=(
+            "[Custom Variables] Could not update custom variable {0}: {1}"
+        )
+    )
+
 
     _CVARS_SINGLE = 0
     _CVARS_SET = 1
@@ -54,10 +63,8 @@ init 100 python in fom_presence_extensions:
                     _cvars_export_var_set(supplier())
 
             except Exception as e:
-                fom_presence._error((
-                    "[Custom Variables] Could not update custom variable {0}: "
-                    "{1}"
-                ).format(name, e))
+                with error.temporary_context(error.EXTENSIONS_CONTEXT):
+                    _ERROR_VAR_UPDATING.report(name, e)
 
 
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=-10)

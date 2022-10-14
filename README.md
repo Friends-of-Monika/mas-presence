@@ -17,6 +17,12 @@
   <a href="https://ko-fi.com/Y8Y15BC52">
     <img alt="Ko-fi badge" src="https://ko-fi.com/img/githubbutton_sm.svg" height="20">
   </a>
+  <a href="https://mon.icu/discord">
+    <img alt="Discord server" src="https://discordapp.com/api/guilds/1029849988953546802/widget.png?style=shield">
+  </a>
+  <a href="https://ko-fi.com/Y8Y15BC52">
+    <img alt="Ko-fi badge" src="https://ko-fi.com/img/githubbutton_sm.svg" height="20">
+  </a>
 </p>
 
 <p align="center">
@@ -44,6 +50,8 @@
     * Dedicated presence config for anniversary dates
     * Time of day-based presences
     * Monika and her player's birthday special presence layouts
+    * Support for Be Right Back in base game as well as custom be right backs
+      from submods from my-otter-self, geneTechnician and other people!
   * Contains custom variables extensions that can be used in text lines
 
 ## ❓ Installing

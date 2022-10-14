@@ -5,14 +5,15 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init 10 python in fom_presence:
+init 10 python in _fom_presence_util:
 
     import store
+
     from store import mas_calendar
     from store import mas_getEV
 
 
-init -1000 python in fom_presence:
+init -1000 python in _fom_presence_util:
 
     import os
     import datetime
@@ -20,7 +21,7 @@ init -1000 python in fom_presence:
     import sys
 
 
-    def _get_script_file(fallback=None, relative=False):
+    def get_script_file(fallback=None, relative=False):
         """
         Uses internal Ren'Py function renpy.get_filename_line() to locate
         current script file and get its location, accounting for potential
@@ -114,13 +115,47 @@ init -1000 python in fom_presence:
             return "/".join(parts)
 
 
-    def _str_detitle(s):
+    def str_detitle(s):
+        """
+        Does the opposite of str.title() by converting first character in string
+        to its lowercase counterpart. If empty string is passed, an empty string
+        is returned correspondingly.
+
+        IN:
+            s -> str:
+                String to convert first character of to lowercase.
+
+        OUT:
+            str:
+                String with first charater in lowercase, or an empty string if
+                an empty string is passed.
+        """
+
         if len(s) == 0:
             return s
         return s[0].lower() + s[1:]
 
 
-    def _get_next_event(n_days):
+    def get_next_event(n_days):
+        """
+        Finds the closest calendar event within next N days. If none found,
+        returns None.
+
+        IN:
+            n_days -> int:
+                Amount of days to scan for upcoming events.
+
+        OUT:
+            Tuple of the following items:
+                [0]: amount of days until upcoming event
+                [1]: event prompt
+                [2]: event key
+                [3]: event starting date
+
+            None:
+                If no upcoming events were found.
+        """
+
         events = list()
 
         cur = datetime.date.today()
@@ -151,19 +186,3 @@ init -1000 python in fom_presence:
 
         events.sort(key=lambda it: it[3])
         return events[0]
-
-
-    class _Provider(object):
-        def __init__(self, provide_func):
-            self._provide = provide_func
-
-        def get(self, *args, **kwargs):
-            return self._provide(*args, **kwargs)
-
-
-    if sys.version_info.major == 2:
-        def _open_encoding(path, mode, encoding="utf-8"):
-            return io.open(path, "r", encoding="utf-8")
-    else:
-        def _open_encoding(path, mode, encoding="utf-8"):
-            return open(path, "r", encoding="utf-8")

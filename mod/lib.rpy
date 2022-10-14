@@ -5,14 +5,15 @@
 # https://github.com/friends-of-monika/discord-presence-submod
 
 
-init -999 python in fom_presence:
+init -99 python in _fom_presence_lib:
 
+    import store
+
+    from store import _fom_presence as mod
+
+    import os
     import sys
 
 
     if sys.version_info.major == 2:
-        def _get_lib_dir():
-            _file = _get_script_file(fallback="game/Submods/Discord Presence Submod/lib.rpy")
-            return os.path.join(renpy.config.basedir, "/".join(_file.split("/")[:-1]), "lib")
-
-        sys.path.append(_get_lib_dir())
+        sys.path.append(os.path.join(mod.basedir, "lib", "py2"))

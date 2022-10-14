@@ -10,7 +10,7 @@
 # - https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md
 # - https://discord.com/developers/docs/rich-presence/how-to
 
-init -100 python in fom_presence:
+init -100 python in _fom_presence_discord:
 
     # Imports
 
@@ -43,6 +43,11 @@ init -100 python in fom_presence:
 
     EVT_READY = "READY"
     EVT_ERROR = "ERROR"
+
+
+    ## Socket timeout
+
+    SOCK_TIMEOUT = 1
 
 
     # Platform-specific approaches to IPC sockets (Unix) and pipes (Windows.)
@@ -78,6 +83,7 @@ init -100 python in fom_presence:
                     Array, list or any other iterable containing bytes to write.
             """
 
+            self._sock.settimeout(SOCK_TIMEOUT)
             self._sock.sendall(data)
 
         def read(self, size):
@@ -93,6 +99,7 @@ init -100 python in fom_presence:
                     Read buffer of data (size of 0 to size.)
             """
 
+            self._sock.settimeout(SOCK_TIMEOUT)
             return self._sock.recv(size)
 
         def close(self):
@@ -123,15 +130,24 @@ init -100 python in fom_presence:
             "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"
         ]) if path is not None] or ["/tmp"])[0]
 
+        # NOTE: It is incredibly rare that this is set to 0 or 1.
         # Now having base path, construct path to IPC socket. Try up to 10
         # possible paths (they all have suffix number.)
         for i in range(10):
             sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
-
             if os.path.exists(sock_path):
                 sock = socket.socket(socket.AF_UNIX)
-                sock.connect(sock_path)
-                return _UnixSocket(sock)
+                sock.settimeout(SOCK_TIMEOUT)
+
+                try:
+                    sock.connect(sock_path)
+                    return _UnixSocket(sock)
+                except socket.error as e:
+                    # If socket is unhandled (somehow), connection will fail
+                    # with ECONNREFUSED. Just pass this socket and try to find
+                    # another one.
+                    if e.errno != errno.ECONNREFUSED:
+                        raise
 
         return None
 
@@ -402,14 +418,42 @@ init -100 python in fom_presence:
     ## Packet implementation
 
     class Packet(object):
-        # TODO: Documentation here and further on
+        """
+        Packet class represents Discord IPC/RPC packet with opcode and raw
+        (unencoded) payload.
+        """
 
         def __init__(self, opcode, payload=None):
+            """
+            Creates a new instance of Packet with the provided opcode and
+            payload (empty if not provided.)
+
+            IN:
+                opcode -> int:
+                    Opcode of this packet. Use OP_-prefixed constants defined
+                    in this store for convenience.
+
+                payload -> dict[Any, Any] or None, default None:
+                    Payload of this packet. If not provided, None by default.
+            """
+
             self.opcode = opcode
             self.payload = payload
 
         @staticmethod
         def load(reader):
+            """
+            Loads (reads) packet from the reader stream.
+
+            IN:
+                reader -> file-like object:
+                    Reader to read packet from.
+
+            OUT:
+                Packet:
+                    Packet deserialized from the stream.
+            """
+
             # Read chunk of data for two 4-byte integers (opcode + length) and
             # unpack struct from it.
             # <II - less endian (<), opcode (I), packet length (I)
@@ -422,6 +466,14 @@ init -100 python in fom_presence:
             return Packet(op, dd)
 
         def dump(self, writer):
+            """
+            Dumps (writes) packet to the writer stream.
+
+            IN:
+                writer -> file-like object:
+                    Writer to write packet to.
+            """
+
             # Serialize data as JSON and encode it as UTF-8 string.
             ds = json.dumps(self.payload, separators=(",", ":")).encode("utf-8")
 
@@ -439,23 +491,67 @@ init -100 python in fom_presence:
             buf.seek(0)  # Reset to 0 after writing.
             writer.write(buf.read())
 
-        def __str__(self):
-            return "<Packet opcode={0} payload={1}>".format(self.opcode, self.payload)
+        def __repr__(self):
+            """
+            Generates representing string for this Packet instance that includes
+            opcode and payload formatted with their own representing strings.
+            """
+
+            return "<Packet opcode={0!r} payload={1!r}>".format(self.opcode, self.payload)
 
     ## Packet type implementations as subclasses
 
     class Identify(Packet):
+        """
+        Identify is the first packet sent by the client after connection during
+        the handshake phase.
+        """
+
         def __init__(self, client_id):
+            """
+            Creates a new instance of Identify packet with the provided client
+            ID.
+
+            IN:
+                client_id -> int:
+                    Client ID to include in packet.
+            """
+
             super(Identify, self).__init__(OP_IDENTIFY, dict(
                 v=1, client_id=str(client_id)
             ))
 
     class Ping(Packet):
+        """
+        Ping is the packet sent to RPC socket to ensure it is still operational.
+        """
+
         def __init__(self):
+            """
+            Creates a new instance of Ping packet.
+            """
+
             super(Ping, self).__init__(OP_PING, dict(msg="pong"))
 
     class Command(Packet):
+        """
+        Command is the packet sent to RPC socket to invoke a command and get a
+        response.
+        """
+
         def __init__(self, command, args):
+            """
+            Creates a new instance of Command packet with the provided command
+            type and arguments. Use CMD_-prefixed constants for convenience.
+
+            IN:
+                command -> str:
+                    Command type to invoke.
+
+                args -> dict[str, Any]:
+                    Arguments to the command.
+            """
+
             super(Command, self).__init__(OP_DISPATCH, dict(
                 cmd=command,
                 args=args,
@@ -463,10 +559,37 @@ init -100 python in fom_presence:
             ))
 
     class SetActivity(Command):
+        """
+        SetActivity is a command to set Rich Presence activity.
+        """
+
         def __init__(self, activity):
+            """
+            Creates a new instance of SetActivity command with the provided
+            activity object that will be serialized into command arguments.
+
+            IN:
+                activity -> Activity:
+                    Activity to use in command arguments to CMD_SET_ACTIVITY.
+            """
+
             super(SetActivity, self).__init__(CMD_SET_ACTIVITY, dict(
                 pid=os.getpid(),
                 activity=activity.to_dict()
+            ))
+
+    class ClearActivity(Command):
+        """
+        ClearActivity is a command to clear Rich Presence activity.
+        """
+
+        def __init__(self):
+            """
+            Creates a new instance of ClearActivity command.
+            """
+
+            super(ClearActivity, self).__init__(CMD_SET_ACTIVITY, dict(
+                pid=os.getpid()
             ))
 
 
@@ -477,7 +600,25 @@ init -100 python in fom_presence:
     ## Packet-wrapping error
 
     class CallError(Exception):
+        """
+        CallError exception is raised when a Command packet was sent and an
+        error message response was received and it is used to wrap the error
+        code and the error message.
+        """
+
         def __init__(self, code, message):
+            """
+            Creates a new instance of CallError with the provided error code and
+            message.
+
+            IN:
+                code -> int:
+                    Error code number.
+
+                message -> str:
+                    Error message string.
+            """
+
             super(CallError, self).__init__(
                 code, message
             )
@@ -487,6 +628,23 @@ init -100 python in fom_presence:
 
         @staticmethod
         def from_packet(packet):
+            """
+            Parses packet payload and checks opcode and returns a CallError
+            constructed with the error payload data.
+
+            IN:
+                packet -> Packet:
+                    Packet to use payload and opcode from.
+
+            OUT:
+                CallError:
+                    CallError is returned when packet was containing error data
+                    and had an erroneous opcode.
+                None:
+                    None is returned when provided packet wasn't containing an
+                    error response.
+            """
+
             if (
                 packet.opcode == OP_CLOSE
                 and "code" in packet.payload
@@ -504,22 +662,79 @@ init -100 python in fom_presence:
             return None
 
         def __str__(self):
-            return str("[Error {0}] {1}".format(self.code, self.message))
+            """
+            Returns string representation of this CallError that includes error
+            code and error message.
+            """
+
+            return "[Error {0}] {1}".format(self.code, self.message)
+
+        def __repr__(self):
+            """
+            Returns representing string that includes parameters this CallError
+            was constructed with.
+            """
+
+            return "CallError({0}, {1!r})".format(self.code, self.message)
 
     ## Protocol error wrapping packet IO errors
 
     class ProtocolError(Exception):
+        """
+        ProtocolError wraps up packet input/output errors such as struct reading
+        errors or IO errors.
+        """
+
         def __init__(self, error):
+            """
+            Creates a new instance of ProtocolError with the provided causing
+            error instance.
+
+            IN:
+                error -> Exception:
+                    Error that caused this ProtocolError.
+            """
+
             super(ProtocolError, self).__init__(error)
 
 
     # Remote Procedure Call client implementation
 
     class Client(object):
+        """
+        Client implements a Discord Rich Presence client.
+        """
+
         def __init__(self, socket):
+            """
+            Creates a new instance of Client with the provided RPC socket.
+
+            IN:
+                socket -> _WindowsSocket or _UnixSocket:
+                    Socket to use in communication with Discord RPC.
+            """
+
             self._sock = socket
 
         def call(self, packet):
+            """
+            Sends a packet and receives response. If response was an error
+            response, a CallError is raised, otherwise the response is returned
+            as packet instance.
+
+            IN:
+                packet -> Packet:
+                    Packet to send.
+
+            OUT:
+                Packet:
+                    Packet is returned when response received was not erroneous.
+
+            RAISES:
+                CallError:
+                    CallError is raised when response received was erroneous.
+            """
+
             try:
                 packet.dump(self._sock)
                 rp = Packet.load(self._sock)
@@ -533,17 +748,84 @@ init -100 python in fom_presence:
             return rp
 
         def handshake(self, client_id):
+            """
+            A convenience method for sending identify packet. Returns received
+            state data on success.
+
+            IN:
+                client_id -> int:
+                    Client ID to send to RPC socket in handshake.
+
+            OUT:
+                Dict[str, Any]:
+                    Discord state data returned after identification.
+
+            RAISES:
+                CallError:
+                    If client ID is invalid, unauthorized or nonexistent.
+            """
+
             res_p = self.call(Identify(client_id))
             return res_p.payload["data"]
 
         def command(self, command, args):
+            """
+            A convenience method for sending command packet.
+
+            IN:
+                command -> str:
+                    Command type to send. Use CMD_-prefixed constants for
+                    convenience.
+
+                args -> dict[str, Any]:
+                    Arguments to provide with command.
+
+            RAISES:
+                CallError:
+                    If command was called wrong.
+            """
+
             self.call(Command(command, args))
 
         def set_activity(self, activity):
+            """
+            A convenience method for sending SetActivity command packet.
+
+            IN:
+                activity -> Activity:
+                    Activity to use in SetActivity command.
+
+            RAISES:
+                CallError:
+                    If activity is invalid.
+            """
+
             self.call(SetActivity(activity))
 
+        def clear_activity(self):
+            """
+            A convenience method for sending ClearActivity command packet.
+
+            RAISES:
+                CallError:
+                    If error occurs.
+            """
+            self.call(ClearActivity())
+
         def ping(self):
+            """
+            A convenience method for sending ping packet.
+
+            RAISES:
+                ProtocolError:
+                    If socket is not longer responsible.
+            """
+
             self.call(Ping())
 
         def disconnect(self):
+            """
+            Disconnects from the socket.
+            """
+
             self._sock.close()
