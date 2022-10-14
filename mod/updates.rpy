@@ -65,3 +65,6 @@ label friends_of_monika_discord_presence_submod_v0_2_0(version="v0_2_0"):
         del _migrate_friends_of_monika_discord_presence_submod_v0_2_0
 
     return
+
+label friends_of_monika_discord_presence_submod_v0_2_1(version="v0_2_1"):
+    return
