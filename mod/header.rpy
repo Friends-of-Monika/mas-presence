@@ -9,14 +9,15 @@ init -990 python in mas_submod_utils:
         author="Friends of Monika",
         name="Discord Presence Submod",
         description="Show everyone who's the person you're spending your time with~",
-        version="0.2.0",
+        version="0.2.1",
         settings_pane="fom_presence_settings_pane",
         version_updates={
             "friends_of_monika_discord_presence_submod_v0_0_1": "friends_of_monika_discord_presence_submod_v0_0_2",
             "friends_of_monika_discord_presence_submod_v0_0_2": "friends_of_monika_discord_presence_submod_v0_0_3",
             "friends_of_monika_discord_presence_submod_v0_0_3": "friends_of_monika_discord_presence_submod_v0_0_4",
             "friends_of_monika_discord_presence_submod_v0_0_4": "friends_of_monika_discord_presence_submod_v0_1_2",
-            "friends_of_monika_discord_presence_submod_v0_1_2": "friends_of_monika_discord_presence_submod_v0_2_0"
+            "friends_of_monika_discord_presence_submod_v0_1_2": "friends_of_monika_discord_presence_submod_v0_2_0",
+            "friends_of_monika_discord_presence_submod_v0_2_0": "friends_of_monika_discord_presence_submod_v0_2_1"
         }
     )
 
