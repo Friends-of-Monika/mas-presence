@@ -187,7 +187,7 @@ init 100 python in _fom_presence:
 
 
     # Runs once on startup, but post-init.
-    @store.mas_submod_utils.functionplugin("ch30_preloop")
+    @store.mas_submod_utils.functionplugin("ch30_preloop", priority=100)
     def on_preloop():
         if persistent._fom_presence_enabled:
             config.reload_configs()
@@ -196,7 +196,7 @@ init 100 python in _fom_presence:
 
 
     # Runs approximately once per 5 seconds while not in dialogue.
-    @store.mas_submod_utils.functionplugin("ch30_loop")
+    @store.mas_submod_utils.functionplugin("ch30_loop", priority=100)
     def on_loop():
         if persistent._fom_presence_enabled:
             if presence.connected:
@@ -206,7 +206,7 @@ init 100 python in _fom_presence:
 
 
     # Runs on exit.
-    @store.mas_submod_utils.functionplugin("exit")
-    def ons_exit():
+    @store.mas_submod_utils.functionplugin("exit", priority=100)
+    def on_exit():
         if presence.connected:
             presence.disconnect()
