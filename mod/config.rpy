@@ -303,7 +303,12 @@ init 90 python in _fom_presence_config:
             """
 
             condition = parser.get_value("Presence", "Condition")
-            compile(condition, "<string>", "eval")
+            if condition is not None:
+                condition = condition.strip()
+                if len(condition) > 0:
+                    compile(condition, "<string>", "eval")
+                else:
+                    condition = None
             self.condition = condition
 
             self.id = parser.get_value("Presence", "ID", str, None)
@@ -412,7 +417,8 @@ init 90 python in _fom_presence_config:
                 try:
                     _file = os.path.join(_dir, _file)
                     config = Config.from_file(_file)
-                    eval(config.condition, dict(), store.__dict__)
+                    if config.condition is not None:
+                        eval(config.condition, dict(), store.__dict__)
 
                     _configs.append((_file, config))
                     if config.id is not None:
@@ -437,11 +443,12 @@ init 90 python in _fom_presence_config:
         """
 
         for _file, conf in _configs:
-            try:
-                if bool(eval(conf.condition, dict(), store.__dict__)):
-                    return conf
-            except Exception as e:
-                _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
+            if conf.condition is not None:
+                try:
+                    if bool(eval(conf.condition, dict(), store.__dict__)):
+                        return conf
+                except Exception as e:
+                    _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
         return None
 
