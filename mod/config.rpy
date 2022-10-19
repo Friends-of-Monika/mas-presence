@@ -410,7 +410,7 @@ init 90 python in _fom_presence_config:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
         # Sort configs on reload to save precious time on every loop.
-        _configs.sort(key=lambda it: it.priority, reverse=True)
+        _configs.sort(key=lambda it: it[1].priority, reverse=True)
 
     def get_active_config():
         """
