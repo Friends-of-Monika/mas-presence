@@ -103,7 +103,7 @@ init -90 python in _fom_presence_error:
 
             self._count += 1
             self._invoke_msg_func_triples([
-                (current_context._logger.warning if self.warning else current_context._logger.error, self._log_report, args),
+                (current_context._logger.warning if self._warning else current_context._logger.error, self._log_report, args),
                 (renpy.notify, self._ui_report, args)
             ])
 

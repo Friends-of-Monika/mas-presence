@@ -38,6 +38,7 @@ init 90 python in _fom_presence_config:
 
     _WARNING_CONFIG_CLASH = error.Error(
         log_message_report="Config from file {0} has conflicting name with some other config: {1}.",
+        ui_message_report="There were some warnings during loading some of the presence configs, see log/submod_log.log.",
         warning=True
     )
 
