@@ -16,6 +16,10 @@ init -90 python in _fom_presence_error:
     import contextlib
 
 
+    _OUTPUT_UI = 0
+    _OUTPUT_LOG = 1
+
+
     class Context(object):
         """
         Context is a simple error context that contains logger to report errors
@@ -25,7 +29,12 @@ init -90 python in _fom_presence_error:
         locations on demand.
         """
 
-        def __init__(self, logger, sample=True):
+        def __init__(
+            self,
+            logger,
+            sample_ui=True,
+            sample_log=False
+        ):
             """
             Constructs a new Context instance with the provided logger and with
             sampling preference.
@@ -40,7 +49,8 @@ init -90 python in _fom_presence_error:
             """
 
             self._logger = logger
-            self._sample = sample
+            self._sample_ui = sample_ui
+            self._sample_log = sample_log
 
     class Error(object):
         """
@@ -53,7 +63,8 @@ init -90 python in _fom_presence_error:
             log_message_report=None,
             log_message_resolve=None,
             ui_message_report=None,
-            ui_message_resolve=None
+            ui_message_resolve=None,
+            warning=False
         ):
             """
             Creates new Error instance with the provided messages (optional.)
@@ -77,6 +88,7 @@ init -90 python in _fom_presence_error:
             self._ui_report=ui_message_report
             self._ui_resolve=ui_message_resolve
             self._count = 0
+            self._warning = warning
 
         def report(self, *args):
             """
@@ -91,7 +103,7 @@ init -90 python in _fom_presence_error:
 
             self._count += 1
             self._invoke_msg_func_triples([
-                (current_context._logger.error, self._log_report, args),
+                (current_context._logger.warning if self.warning else current_context._logger.error, self._log_report, args),
                 (renpy.notify, self._ui_report, args)
             ])
 
@@ -109,8 +121,8 @@ init -90 python in _fom_presence_error:
             if self._count > 0:
                 self._count = 0
                 self._invoke_msg_func_triples([
-                    (current_context._logger.info, self._log_resolve, args),
-                    (renpy.notify, self._ui_resolve, args)
+                    (current_context._logger.info, self._log_resolve, args, _OUTPUT_LOG),
+                    (renpy.notify, self._ui_resolve, args, _OUTPUT_UI)
                 ])
 
         def _invoke_msg_func_triples(self, input):
@@ -124,13 +136,14 @@ init -90 python in _fom_presence_error:
                         [0]: function to pass formatted message to
                         [1]: message template to format with args
                         [2]: args to pass to [1] message
+                        [3]: output type of this message
             """
 
-            for function, message, args in input:
+            for function, message, args, _type in input:
                 if message is not None:
-                    self._invoke_with_err_str(function, message, *args)
+                    self._invoke_with_err_str(function, message, _type, *args)
 
-        def _invoke_with_err_str(self, function, message, *args):
+        def _invoke_with_err_str(self, function, message, _type, *args):
             """
             Invokes provided function with formatted message template if
             sampling is disabled or if occurrences counter is zero.
@@ -146,15 +159,18 @@ init -90 python in _fom_presence_error:
                     Arguments to pass to formatting function.
             """
 
-            if self._count == 0 or not current_context._sample:
+            if self._count == 0 or not (
+                current_context._sample_log and _type == _OUTPUT_LOG or
+                current_context._sample_ui and _type == _OUTPUT_UI
+            ):
                 if args is not None:
                     message = message.format(*args)
                 function(message)
 
 
     MAIN_CONTEXT = Context(logging.DEFAULT)
-    OPTIONS_CONTEXT = Context(logging.DEFAULT, sample=False)
-    EXTENSIONS_CONTEXT = Context(logging.DEFAULT, sample=False)
+    OPTIONS_CONTEXT = Context(logging.DEFAULT, sample_ui=False)
+    EXTENSIONS_CONTEXT = Context(logging.DEFAULT)
 
     current_context = MAIN_CONTEXT
 

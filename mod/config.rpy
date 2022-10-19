@@ -29,11 +29,16 @@ init 90 python in _fom_presence_config:
         import configparser
 
 
-    # Errors
+    # Errors and warnings
 
     _ERROR_CONFIG_LOADING = error.Error(
         log_message_report="Could not load presence config from file {0}: {1}.",
         ui_message_report="Could not load some presence configs, see log/submod_log.log."
+    )
+
+    _WARNING_CONFIG_CLASH = error.Error(
+        log_message_report="Config from file {0} has conflicting name with some other config: {1}.",
+        warning=True
     )
 
 
@@ -300,6 +305,7 @@ init 90 python in _fom_presence_config:
             compile(condition, "<string>", "eval")
             self.condition = condition
 
+            self.id = parser.get_value("Presence", "ID", str, None)
             self.priority = parser.get_value("Presence", "Priority", int, 0)
             self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
 
@@ -380,6 +386,7 @@ init 90 python in _fom_presence_config:
 
     _config_dir = os.path.join(mod.basedir, "config")
     _configs = list()
+    _config_id_map = dict()
 
     def reload_configs():
         """
@@ -391,6 +398,7 @@ init 90 python in _fom_presence_config:
         """
 
         del _configs[:]
+        _config_id_map.clear()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
@@ -407,6 +415,10 @@ init 90 python in _fom_presence_config:
                     eval(config.condition, dict(), store.__dict__)
 
                     _configs.append((_file, config))
+                    if config.id is not None:
+                        if config.id in _config_id_map:
+                            _WARNING_CONFIG_CLASH.report(_file[len(_config_dir) + 1:], config.id)
+                        _config_id_map[config.id] = config
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
@@ -435,3 +447,21 @@ init 90 python in _fom_presence_config:
 
         active.sort(key=lambda it: it.priority, reverse=True)
         return active[0]
+
+    def get_config(_id):
+        """
+        Fetches config by its ID (defined as ID= parameter in Presence section).
+
+        IN:
+            _id -> str:
+                ID of the config to fetch reference to.
+
+        OUT:
+            Config:
+                If config with such ID exists and was successfully loaded.
+
+            None:
+                If config with such ID does not exist.
+        """
+
+        return _config_id_map.get(_id)
