@@ -4,6 +4,9 @@ While Discord Presence Submod configuration system is made to be simple and easy
 to understand, one might need a helping hand to figure what is what and how
 things can be done with it, and this document is exactly what you need.
 
+If you're looking for a way to override *default* config files, see
+[DEFAULTS.md](DEFAULTS.md) page for details.
+
 ## Examples
 
 If you feel like learning by example, you might as well look into `config/`
