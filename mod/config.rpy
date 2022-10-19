@@ -358,7 +358,6 @@ init 90 python in _fom_presence_config:
 
             if self._activity is not None:
                 return self._activity
-
             a = discord.Activity()
 
             if self.state is not None:
@@ -423,6 +422,9 @@ init 90 python in _fom_presence_config:
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
+        # Sort configs on reload to save precious time on every loop.
+        _configs.sort(key=lambda it: it[1].priority, reverse=True)
+
     def get_active_config():
         """
         Evaluates conditions in configs in global Ren'Py scope and returns
@@ -434,20 +436,14 @@ init 90 python in _fom_presence_config:
             error context. Reported errors are not resolved on successful loads.
         """
 
-        active = list()
-
         for _file, conf in _configs:
             try:
                 if bool(eval(conf.condition, dict(), store.__dict__)):
-                    active.append(conf)
+                    return conf
             except Exception as e:
                 _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
-        if len(active) == 0:
-            return None
-
-        active.sort(key=lambda it: it.priority, reverse=True)
-        return active[0]
+        return None
 
     def get_config(_id):
         """
