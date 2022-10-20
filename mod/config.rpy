@@ -360,8 +360,24 @@ init 90 python in _fom_presence_config:
                 c.readfp(f, path.replace("\\", "/").split("/")[:-1])
             return Config(_ParserWrapper(c))
 
-        def inherit(self, config):
-            if self._inherit_applied:
+        def inherit(self, config, force=False):
+            """
+            Copies values from another config (only omitted, None or
+            _none_supplier values) over to this config. Unless force parameter
+            is set to True, does nothing on next call.
+
+            IN:
+                config -> Config:
+                    Config to copy values from. Inherit method is not called,
+                    inheritance is not done recursively by this method, users
+                    should care about this themselves.
+
+                force -> bool, default False:
+                    If True, skips inheritance status checks and applies values
+                    over again.
+            """
+
+            if self._inherit_applied and not force:
                 return
 
             if self.app_id is None:
