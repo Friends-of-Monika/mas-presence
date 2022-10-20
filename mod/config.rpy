@@ -323,7 +323,7 @@ init 90 python in _fom_presence_config:
             self.priority = parser.get_value("Presence", "Priority", int, 0)
             self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
             self.id = parser.get_value("Presence", "ID", str, None)
-            self._inherit = parser.get_value("Presence", "Inherit", str, None)
+            self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
 
             self.app_id = parser.get_value("Client", "ApplicationID", int)
 
@@ -460,10 +460,10 @@ init 90 python in _fom_presence_config:
 
         # Once configs are loaded, we now copy inherited values.
         def inherit(config):
-            if config.inherit is not None:
-                parent = _config_id_map.get(config.inherit)
+            if config.inherit_id is not None:
+                parent = _config_id_map.get(config.inherit_id)
                 if parent is None:
-                    _ERROR_CONFIG_INHERITANCE.report(_file[len(_config_dir) + 1:], config.inherit)
+                    _ERROR_CONFIG_INHERITANCE.report(_file[len(_config_dir) + 1:], config.inherit_id)
                     return
 
                 # Inheritance is done recursively.
