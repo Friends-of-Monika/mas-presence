@@ -339,6 +339,7 @@ init 90 python in _fom_presence_config:
             self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, _none_supplier)
 
             self._activity = None
+            self._inherit_applied = False
 
         @staticmethod
         def from_file(path):
@@ -360,6 +361,9 @@ init 90 python in _fom_presence_config:
             return Config(_ParserWrapper(c))
 
         def inherit(self, config):
+            if self._inherit_applied:
+                return
+
             if self.app_id is None:
                 self.app_id = config.app_id
             if self.details is _none_supplier:
@@ -378,6 +382,8 @@ init 90 python in _fom_presence_config:
                 self.start_ts = config.start_ts
             if self.stop_ts is _none_supplier:
                 self.stop_ts = config.stop_ts
+
+            self._inherit_applied = True
 
         def to_activity(self):
             """
