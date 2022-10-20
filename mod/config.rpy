@@ -464,7 +464,7 @@ init 90 python in _fom_presence_config:
                 parent = _config_id_map.get(config.inherit)
                 if parent is None:
                     _ERROR_CONFIG_INHERITANCE.report(_file[len(_config_dir) + 1:], e)
-                    continue
+                    return
 
                 # Inheritance is done recursively.
                 inherit(parent)
