@@ -401,6 +401,21 @@ init 90 python in _fom_presence_config:
 
             self._inherit_applied = True
 
+        @property
+        def inherited(self):
+            """
+            Returns inheritance status flag value.
+
+            OUT:
+                True:
+                    If this config has inherited from other config.
+
+                False:
+                    If this config has not inherited from another config.
+            """
+
+            return self._inherit_applied
+
         def to_activity(self):
             """
             Creates Activity instance from the values stored in Config.
@@ -482,6 +497,10 @@ init 90 python in _fom_presence_config:
 
         # Once configs are loaded, we now copy inherited values.
         def inherit(config):
+            # Prevent loops and infinite recursions.
+            if config.inherited:
+                return True
+
             if config.inherit_id is not None:
                 parent = _config_id_map.get(config.inherit_id)
                 if parent is None:
