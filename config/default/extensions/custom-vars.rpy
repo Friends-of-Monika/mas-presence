@@ -67,11 +67,11 @@ init 100 python in fom_presence_extensions:
                     _ERROR_VAR_UPDATING.report(name, e)
 
 
-    @store.mas_submod_utils.functionplugin("ch30_preloop", priority=-10)
+    @store.mas_submod_utils.functionplugin("ch30_preloop", priority=10)
     def _cvars_update_preloop():
         _cvars_update_vars(loop=False)
 
 
-    @store.mas_submod_utils.functionplugin("ch30_loop", priority=-10)
-    def update_user_vars():
+    @store.mas_submod_utils.functionplugin("ch30_loop", priority=10)
+    def _cvars_update_loop():
         _cvars_update_vars(loop=True)

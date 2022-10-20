@@ -4,6 +4,9 @@ While Discord Presence Submod configuration system is made to be simple and easy
 to understand, one might need a helping hand to figure what is what and how
 things can be done with it, and this document is exactly what you need.
 
+If you're looking for a way to override *default* config files, see
+[DEFAULTS.md](DEFAULTS.md) page for details.
+
 ## Examples
 
 If you feel like learning by example, you might as well look into `config/`
@@ -75,3 +78,39 @@ and maintainers:
   interpolations.
 * `fom-locations.rpy` provides custom variable for displaying currently active
   background.
+
+### Inheritance
+
+As amount of configs made for Discord Presence Submod grows, so grows the
+redundancy of values shared by several config. To accord for this, a config ID
+and inheritance mechanism was introduced in 0.3.0, which allows setting config
+ID and refer to it in another configs to *copy all missing values* over to
+another config. And in case inherited config inherits from another config...
+Yes, inheritance is processed *recursively.* :)
+
+A real example would be default config which has grown quite big and
+redundantly filled with default `State`, `[Assets]` and other things that one
+would have to change *in every file* if they wanted to override something. To
+improve this situation, we used `ID = default` and `Inherit = Default` in every
+config and removed redundant copies of application ID, assets and text.
+
+#### Parent config (copy FROM) example
+
+```ini
+[Presence]
+ID = Default
+```
+
+#### Child config (copy TO) example
+
+```ini
+[Presence]
+Inherit = Default
+```
+
+Inheritance is processed recursively, which means you can have one config (A)
+inherit values from another (B), then one more config (C) would inherit values
+from A and have values both from A and from B.
+
+Only omitted values are replaced, in case some value is present in the child
+config it will never be replaced.
