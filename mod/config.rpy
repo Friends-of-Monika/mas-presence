@@ -464,14 +464,22 @@ init 90 python in _fom_presence_config:
                 parent = _config_id_map.get(config.inherit_id)
                 if parent is None:
                     _ERROR_CONFIG_INHERITANCE.report(_file[len(_config_dir) + 1:], config.inherit_id)
-                    return
+                    return False
 
                 # Inheritance is done recursively.
-                inherit(parent)
+                if not inherit(parent):
+                    return False
                 config.inherit(parent)
 
-        for _file, config in _configs:
-            inherit(config)
+            return True
+
+        idx = 0
+        while idx < len(_configs):
+            _file, config = _configs[idx]
+            if not inherit(config):
+                del _configs[idx]
+            else:
+                idx += 1
 
         # Sort configs on reload to save precious time on every loop.
         _configs.sort(key=lambda it: it[1].priority, reverse=True)
