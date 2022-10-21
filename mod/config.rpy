@@ -391,6 +391,7 @@ init 90 python in _fom_presence_config:
                 config -> Config:
                     Config to copy values from.
             """
+
             if self.app_id is None:
                 self.app_id = config.app_id
             if self.details is _none_supplier:
