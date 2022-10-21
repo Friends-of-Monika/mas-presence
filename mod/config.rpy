@@ -41,10 +41,11 @@ init 90 python in _fom_presence_config:
         ui_message_report="Could not load some presence configs, see log/submod_log.log."
     )
 
-
-    # Logger
-
-    _logger = logging.DEFAULT
+    _WARNING_CONFIG_CLASH = error.Error(
+        log_message_report="Config from file {0} has conflicting name with some other config: {1}.",
+        ui_message_report="There were some warnings during loading some of the presence configs, see log/submod_log.log.",
+        warning=True
+    )
 
 
     # Supplier and related functions and constructors
@@ -488,10 +489,9 @@ init 90 python in _fom_presence_config:
 
                     _configs.append((_file, config))
                     if config.id is not None:
-                        if not config.id in _config_id_map or config.priority > _config_id_map[config.id].priority:
-                            _logger.info("Config {0} has existing ID and higher priority over existing config {1}, overriding.".format(_file[len(_config_dir) + 1:], e))
-                            _config_id_map[config.id] = config
-
+                        if config.id in _config_id_map:
+                            _WARNING_CONFIG_CLASH.report(_file[len(_config_dir) + 1:], config.id)
+                        _config_id_map[config.id] = config
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
 
