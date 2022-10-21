@@ -483,20 +483,20 @@ init 90 python in _fom_presence_config:
 
                 try:
                     _file = os.path.join(_dir, _file)
-                    config = Config.from_file(_file)
-                    if config.condition is not None:
-                        eval(config.condition, dict(), store.__dict__)
-
-                    _configs.append((_file, config))
-                    if config.id is not None:
-                        if config.id in _config_id_map:
-                            _WARNING_CONFIG_CLASH.report(_file[len(_config_dir) + 1:], config.id)
-                        _config_id_map[config.id] = config
+                    file_rel = _file[len(_config_dir) + 1:]
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
+                    _ERROR_CONFIG_LOADING.report(file_rel, e)
+
+                config = Config.from_file(_file)
+                if config.condition is not None:
+                    eval(config.condition, dict(), store.__dict__)
+
+                _configs.append((file_rel, config))
+                if config.id is not None:
+                    _config_id_map[config.id] = config
 
         # Once configs are loaded, we now copy inherited values.
-        def inherit(config):
+        def inherit(config, _file):
             # Prevent loops and infinite recursions.
             if config.inherited:
                 return True
@@ -504,7 +504,7 @@ init 90 python in _fom_presence_config:
             if config.inherit_id is not None:
                 parent = _config_id_map.get(config.inherit_id)
                 if parent is None:
-                    _ERROR_CONFIG_INHERITANCE.report(_file[len(_config_dir) + 1:], config.inherit_id)
+                    _ERROR_CONFIG_INHERITANCE.report(_file, config.inherit_id)
                     return False
 
                 # Inheritance is done recursively.
@@ -517,8 +517,10 @@ init 90 python in _fom_presence_config:
         idx = 0
         while idx < len(_configs):
             _file, config = _configs[idx]
-            if not inherit(config):
+            if not inherit(config, _file):
                 del _configs[idx]
+                if config.id is not None:
+                    del _config_id_map[config.id]
             else:
                 idx += 1
 
