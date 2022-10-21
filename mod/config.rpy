@@ -330,6 +330,7 @@ init 90 python in _fom_presence_config:
             self.id = parser.get_value("Presence", "ID", str, None)
             self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
             self.override_id = parser.get_value("Presence", "Override", str, None)
+            self.disable = parser.get_value("Presence", "Disable", _parse_bool, False)
 
             self.app_id = parser.get_value("Client", "ApplicationID", int)
 
@@ -390,6 +391,7 @@ init 90 python in _fom_presence_config:
                 config -> Config:
                     Config to copy values from.
             """
+
             if self.app_id is None:
                 self.app_id = config.app_id
             if self.details is _none_supplier:
@@ -496,7 +498,9 @@ init 90 python in _fom_presence_config:
                 ov = id_map.get(config.id)
                 if ov is not None:
                     _WARNING_CONFIG_CLASH.report(rel_file, config.id)
+
                 id_map[config.id] = config
+                id_map[rel_file] = config
 
         def inherit(config):
             # Prevent loops and infinite recursions.
@@ -575,7 +579,7 @@ init 90 python in _fom_presence_config:
         for _file, conf in _configs:
             if conf.condition is not None:
                 try:
-                    if bool(eval(conf.condition, dict(), store.__dict__)):
+                    if not conf.disable and bool(eval(conf.condition, dict(), store.__dict__)):
                         return conf
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
