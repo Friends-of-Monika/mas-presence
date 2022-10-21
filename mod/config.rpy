@@ -493,7 +493,8 @@ init 90 python in _fom_presence_config:
 
                 _configs.append((file_rel, config))
                 if config.id is not None:
-                    _config_id_map[config.id] = config
+                    if _config_id_map[config.id].priority < config.priority:
+                        _config_id_map[config.id] = config
 
         # Once configs are loaded, we now copy inherited values.
         def inherit(config, _file):
