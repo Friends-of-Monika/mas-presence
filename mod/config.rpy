@@ -537,7 +537,7 @@ init 90 python in _fom_presence_config:
             return True
 
         def remove_config(config):
-            del configs[rel_file]
+            del configs[config.file]
             if config.id is not None:
                 del id_map[config.id]
 
