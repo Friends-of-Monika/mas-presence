@@ -490,10 +490,13 @@ init 90 python in _fom_presence_config:
                     continue
 
                 configs[rel_file] = config
-                if config.id is not None:
-                    ov = id_map.get(config.id)
-                    if ov is None or ov.priority <= config.priority:
-                        id_map[config.id] = config
+                if config.id is None:
+                    config.id = rel_file
+
+                ov = id_map.get(config.id)
+                if ov is not None:
+                    _WARNING_CONFIG_CLASH.report(rel_file, config.id)
+                id_map[config.id] = config
 
         def inherit(config):
             # Prevent loops and infinite recursions.
