@@ -527,9 +527,11 @@ init 90 python in _fom_presence_config:
         del _configs[:]
         _config_id_map.clear()
 
-        # Sort configs on reload to save precious time on every loop.
-        _configs.extend(sorted(configs.values(), key=lambda it: it[1].priority, reverse=True))
+        _configs.extend(list(configs.items()))
         _config_id_map.update(id_map)
+
+        # Sort configs on reload to save precious time on every loop.
+        _configs.sort(key=lambda it: it[1].priority, reverse=True)
 
     def get_active_config():
         """
