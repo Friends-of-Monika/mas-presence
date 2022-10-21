@@ -467,8 +467,8 @@ init 90 python in _fom_presence_config:
         configs = dict()
         id_map = dict()
 
+        inherit_list = list()
         override_map = dict()
-        inherit_list = dict()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
@@ -546,17 +546,17 @@ init 90 python in _fom_presence_config:
                 remove(config)
 
         # Apply overrides.
-        for _id, configs in override_map.items():
+        for _id, overrides in override_map.items():
             target = id_map.get(_id)
             if target is None:
-                _ERROR_CONFIG_OVERRIDE.report(configs[0].file, _id)
+                _ERROR_CONFIG_OVERRIDE.report(overrides[0].file, _id)
                 continue
 
-            configs.sort(key=lambda it: it.priority, reverse=True)
-            for rem_conf in (configs[1:] + [target]):
+            overrides.sort(key=lambda it: it.priority, reverse=True)
+            for rem_conf in (overrides[1:] + [target]):
                 remove(rem_conf)
 
-            override = configs[0]
+            override = overrides[0]
             override.id = _id
             id_map[_id] = override
 
