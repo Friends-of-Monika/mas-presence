@@ -330,6 +330,7 @@ init 90 python in _fom_presence_config:
             self.id = parser.get_value("Presence", "ID", str, None)
             self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
             self.override_id = parser.get_value("Presence", "Override", str, None)
+            self.override_id = parser.get_value("Presence", "Disable", _parse_bool, False)
 
             self.app_id = parser.get_value("Client", "ApplicationID", int)
 
@@ -575,7 +576,7 @@ init 90 python in _fom_presence_config:
         for _file, conf in _configs:
             if conf.condition is not None:
                 try:
-                    if bool(eval(conf.condition, dict(), store.__dict__)):
+                    if not conf.disable and bool(eval(conf.condition, dict(), store.__dict__)):
                         return conf
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
