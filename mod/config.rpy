@@ -539,12 +539,6 @@ init 90 python in _fom_presence_config:
             if config.id is not None:
                 del id_map[config.id]
 
-        # Apply inheritance.
-        while len(inherit_list) > 0:
-            config = inherit_list.pop()
-            if not inherit(config):
-                remove(config)
-
         # Apply overrides.
         for _id, overrides in override_map.items():
             target = id_map.get(_id)
@@ -559,6 +553,12 @@ init 90 python in _fom_presence_config:
             override = overrides[0]
             override.id = _id
             id_map[_id] = override
+
+        # Apply inheritance.
+        while len(inherit_list) > 0:
+            config = inherit_list.pop()
+            if not inherit(config):
+                remove(config)
 
         # Re-populate config list with config list used locally.
         del _configs[:]
