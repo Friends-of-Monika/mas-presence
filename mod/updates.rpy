@@ -74,3 +74,6 @@ label friends_of_monika_discord_presence_submod_v0_3_0(version="v0_3_0"):
 
 label friends_of_monika_discord_presence_submod_v0_3_1(version="v0_3_1"):
     return
+
+label friends_of_monika_discord_presence_submod_v0_3_2(version="v0_3_2"):
+    return
