@@ -330,7 +330,7 @@ init 90 python in _fom_presence_config:
             self.id = parser.get_value("Presence", "ID", str, None)
             self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
             self.override_id = parser.get_value("Presence", "Override", str, None)
-            self.override_id = parser.get_value("Presence", "Disable", _parse_bool, False)
+            self.disable = parser.get_value("Presence", "Disable", _parse_bool, False)
 
             self.app_id = parser.get_value("Client", "ApplicationID", int)
 
