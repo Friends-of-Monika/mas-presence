@@ -577,9 +577,9 @@ init 90 python in _fom_presence_config:
         """
 
         for _file, conf in _configs:
-            if conf.condition is not None:
+            if not conf.disable and conf.condition is not None:
                 try:
-                    if not conf.disable and bool(eval(conf.condition, dict(), store.__dict__)):
+                    if bool(eval(conf.condition, dict(), store.__dict__)):
                         return conf
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
