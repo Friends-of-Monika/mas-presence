@@ -469,8 +469,8 @@ init 90 python in _fom_presence_config:
             error context. Reported errors are not resolved on successful loads.
         """
 
-        del _configs[:]
-        _config_id_map.clear()
+        configs = dict()
+        id_map = dict()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
@@ -481,22 +481,25 @@ init 90 python in _fom_presence_config:
                 ):
                     continue
 
+                _file = os.path.join(_dir, _file)
+                rel_file = _file[len(_config_dir) + 1:]
+
                 try:
-                    _file = os.path.join(_dir, _file)
-                    file_rel = _file[len(_config_dir) + 1:]
+                    config = Config.from_file(_file)
+                    if config.condition is not None:
+                        eval(config.condition, dict(), store.__dict__)
                 except Exception as e:
                     _ERROR_CONFIG_LOADING.report(file_rel, e)
+                    continue
 
-                config = Config.from_file(_file)
-                if config.condition is not None:
-                    eval(config.condition, dict(), store.__dict__)
-
-                _configs.append((file_rel, config))
+                configs[rel_file] = config
                 if config.id is not None:
-                    if _config_id_map[config.id].priority < config.priority:
-                        _config_id_map[config.id] = config
+                    ids = id_map.get(config.id)
+                    if ids is None:
+                        id_map[config.id] = [config]
+                    else:
+                        ids.append(config)
 
-        # Once configs are loaded, we now copy inherited values.
         def inherit(config, _file):
             # Prevent loops and infinite recursions.
             if config.inherited:
@@ -515,18 +518,18 @@ init 90 python in _fom_presence_config:
 
             return True
 
-        idx = 0
-        while idx < len(_configs):
-            _file, config = _configs[idx]
-            if not inherit(config, _file):
-                del _configs[idx]
+        for rel_file, config in list(configs.items()):
+            if not inherit(config, rel_file):
+                del configs[rel_file]
                 if config.id is not None:
-                    del _config_id_map[config.id]
-            else:
-                idx += 1
+                    del id_map[config.id]
+
+        del _configs[:]
+        _config_id_map.clear()
 
         # Sort configs on reload to save precious time on every loop.
-        _configs.sort(key=lambda it: it[1].priority, reverse=True)
+        _configs.extend(sorted(configs.values(), key=lambda it: it[1].priority, reverse=True))
+        _config_id_map.update(id_map)
 
     def get_active_config():
         """
