@@ -114,3 +114,63 @@ from A and have values both from A and from B.
 
 Only omitted values are replaced, in case some value is present in the child
 config it will never be replaced.
+
+### Overriding
+
+Continuing to counter issues with default config customization, in patch 0.3.1
+two more important parameters have been introduced with one of them being
+`Override =`.
+
+With `Override`, you can replace existing config by its ID or path (relative to
+config directory, see example below) *entirely*, combined with `Inherit` (see
+above) you could could use it to alter just a part of existing config without
+a need to copy it entirely.
+
+#### Existing config
+
+```ini
+[Presence]
+ID = MyAwesomeConfig
+
+[Activity]
+State = Having fun at [loc_prompt]
+```
+
+#### Overriding config
+
+```ini
+[Presence]
+Override = MyAwesomeConfig
+
+[Activity]
+State = Spending time together at [loc_prompt]
+```
+
+Sometimes however, if an existing config has no ID assigned and you don't want
+to edit it, you can use a path (relative to config directory) instead:
+
+```ini
+[Presence]
+# Full path would be game/Submods/Discord Presence Submod/config/default/...
+# but you only need part AFTER config/, without a leading slash (/)
+Override = default/configs/default.conf
+```
+
+### Disabling
+
+Another parameter introduced in 0.3.1 is `Disable =`, which if set to `True`
+will disable the config and prevent it from being chosen. This however does not
+affect inheriting and overriding and you can still use it as a base for other
+configs or override some other config and disable it.
+
+For example, if there is a default config you want to disable, you'd create
+another config and use `Override` like this:
+
+```ini
+[Presence]
+Override = default/configs/some-config-to-disable.conf
+Disable = True
+```
+
+This config will replace a config you specified in `Override` and disable it,
+making it never be chosen.

@@ -41,6 +41,11 @@ init 90 python in _fom_presence_config:
         ui_message_report="Could not load some presence configs, see log/submod_log.log."
     )
 
+    _ERROR_CONFIG_OVERRIDE = error.Error(
+        log_message_report="Presence config {0} overrides nonexistent config ID: {1}.",
+        ui_message_report="Could not load some presence configs, see log/submod_log.log."
+    )
+
     _WARNING_CONFIG_CLASH = error.Error(
         log_message_report="Config from file {0} has conflicting name with some other config: {1}.",
         ui_message_report="There were some warnings during loading some of the presence configs, see log/submod_log.log.",
@@ -324,6 +329,8 @@ init 90 python in _fom_presence_config:
             self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
             self.id = parser.get_value("Presence", "ID", str, None)
             self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
+            self.override_id = parser.get_value("Presence", "Override", str, None)
+            self.disable = parser.get_value("Presence", "Disable", _parse_bool, False)
 
             self.app_id = parser.get_value("Client", "ApplicationID", int)
 
@@ -339,7 +346,7 @@ init 90 python in _fom_presence_config:
             self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, _none_supplier)
 
             self._activity = None
-            self._inherit_applied = False
+            self._file = None
 
         @staticmethod
         def from_file(path):
@@ -358,27 +365,32 @@ init 90 python in _fom_presence_config:
             c = configparser.ConfigParser()
             with _open_with_encoding(path, "r", encoding="utf-8") as f:
                 c.readfp(f, path.replace("\\", "/").split("/")[:-1])
-            return Config(_ParserWrapper(c))
 
-        def inherit(self, config, force=False):
+            config = Config(_ParserWrapper(c))
+            config._file = path
+            return config
+
+        @property
+        def file(self):
+            """
+            Returns path to file this config was loaded from.
+
+            OUT:
+                str:
+                    Path to config file.
+            """
+
+            return self._file
+
+        def copy_from(self, config):
             """
             Copies values from another config (only omitted, None or
-            _none_supplier values) over to this config. Unless force parameter
-            is set to True, does nothing on next call.
+            _none_supplier values) over to this config.
 
             IN:
                 config -> Config:
-                    Config to copy values from. Inherit method is not called,
-                    inheritance is not done recursively by this method, users
-                    should care about this themselves.
-
-                force -> bool, default False:
-                    If True, skips inheritance status checks and applies values
-                    over again.
+                    Config to copy values from.
             """
-
-            if self._inherit_applied and not force:
-                return
 
             if self.app_id is None:
                 self.app_id = config.app_id
@@ -398,23 +410,6 @@ init 90 python in _fom_presence_config:
                 self.start_ts = config.start_ts
             if self.stop_ts is _none_supplier:
                 self.stop_ts = config.stop_ts
-
-            self._inherit_applied = True
-
-        @property
-        def inherited(self):
-            """
-            Returns inheritance status flag value.
-
-            OUT:
-                True:
-                    If this config has inherited from other config.
-
-                False:
-                    If this config has not inherited from another config.
-            """
-
-            return self._inherit_applied
 
         def to_activity(self):
             """
@@ -469,8 +464,11 @@ init 90 python in _fom_presence_config:
             error context. Reported errors are not resolved on successful loads.
         """
 
-        del _configs[:]
-        _config_id_map.clear()
+        configs = dict()
+        id_map = dict()
+
+        inherited = set()
+        overridden = set()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
@@ -481,46 +479,88 @@ init 90 python in _fom_presence_config:
                 ):
                     continue
 
+                _file = os.path.join(_dir, _file)
+                rel_file = _file[len(_config_dir) + 1:]
+
                 try:
-                    _file = os.path.join(_dir, _file)
                     config = Config.from_file(_file)
                     if config.condition is not None:
                         eval(config.condition, dict(), store.__dict__)
-
-                    _configs.append((_file, config))
-                    if config.id is not None:
-                        if config.id in _config_id_map:
-                            _WARNING_CONFIG_CLASH.report(_file[len(_config_dir) + 1:], config.id)
-                        _config_id_map[config.id] = config
+                    config._file = rel_file
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
+                    _ERROR_CONFIG_LOADING.report(file_rel, e)
+                    continue
 
-        # Once configs are loaded, we now copy inherited values.
+                configs[rel_file] = config
+                if config.id is None:
+                    config.id = rel_file
+
+                ov = id_map.get(config.id)
+                if ov is not None:
+                    _WARNING_CONFIG_CLASH.report(rel_file, config.id)
+
+                id_map[config.id] = config
+                id_map[rel_file] = config
+
         def inherit(config):
             # Prevent loops and infinite recursions.
-            if config.inherited:
+            if config in inherited:
                 return True
 
             if config.inherit_id is not None:
-                parent = _config_id_map.get(config.inherit_id)
+                parent = id_map.get(config.inherit_id)
                 if parent is None:
-                    _ERROR_CONFIG_INHERITANCE.report(_file[len(_config_dir) + 1:], config.inherit_id)
+                    _ERROR_CONFIG_INHERITANCE.report(config.file, config.inherit_id)
                     return False
 
                 # Inheritance is done recursively.
                 if not inherit(parent):
                     return False
-                config.inherit(parent)
+                config.copy_from(parent)
 
+            # Add to list of applied inheritances.
+            inherited.add(config)
             return True
 
-        idx = 0
-        while idx < len(_configs):
-            _file, config = _configs[idx]
-            if not inherit(config):
-                del _configs[idx]
-            else:
-                idx += 1
+        def override(config):
+            # Prevent loops and infinite recursions.
+            if config in overridden:
+                return True
+
+            if config.override_id is not None:
+                ov = id_map.get(config.override_id)
+                if ov is None:
+                    _ERROR_CONFIG_OVERRIDE.report(config.file, config.override_id)
+                    return False
+
+                if not override(ov):
+                    return False
+
+                remove_config(ov)
+                config.id = ov.id
+                id_map[ov.id] = config
+
+            overridden.add(config)
+            return True
+
+        def remove_config(config):
+            del configs[config.file]
+            if config.id is not None:
+                del id_map[config.id]
+
+        for rel_file, config in list(configs.items()):
+            if rel_file not in configs:
+                continue
+
+            if not (inherit(config) and override(config)):
+                remove_config(config)
+                continue
+
+        del _configs[:]
+        _config_id_map.clear()
+
+        _configs.extend(list(configs.items()))
+        _config_id_map.update(id_map)
 
         # Sort configs on reload to save precious time on every loop.
         _configs.sort(key=lambda it: it[1].priority, reverse=True)
@@ -537,7 +577,7 @@ init 90 python in _fom_presence_config:
         """
 
         for _file, conf in _configs:
-            if conf.condition is not None:
+            if not conf.disable and conf.condition is not None:
                 try:
                     if bool(eval(conf.condition, dict(), store.__dict__)):
                         return conf
