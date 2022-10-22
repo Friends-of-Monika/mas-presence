@@ -11,8 +11,9 @@ If you're looking for a way to override *default* config files, see
 
 If you feel like learning by example, you might as well look into `config/`
 folder which contains all maintained presence config files that are well
-commented and documented for your convenience and understanding. If you want to
-learn some theory though, here it is, right below.
+commented and documented for your convenience and understanding as well as
+[EXAMPLES.md](EXAMPLES.md) page. If you want to learn some theory though, here
+it is, right below.
 
 ## Basic principles
 
