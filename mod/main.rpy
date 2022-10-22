@@ -113,7 +113,7 @@ init 100 python in _fom_presence:
                 prev_client.clear_activity()
                 return
 
-            if prev_config != self._config:
+            if prev_config is None or prev_config != self._config:
                 self._last_mean_update = datetime.datetime.now()
 
             client_with_socket = self._get_or_connect_client(self._config)
