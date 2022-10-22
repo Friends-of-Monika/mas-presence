@@ -156,6 +156,9 @@ to edit it, you can use a path (relative to config directory) instead:
 Override = default/configs/default.conf
 ```
 
+Taking possible override conflicts into account, if there are is more than one
+override existing for a certain config, one with higher priority prevails.
+
 ### Disabling
 
 Another parameter introduced in 0.3.1 is `Disable =`, which if set to `True`
