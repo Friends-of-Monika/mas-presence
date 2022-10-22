@@ -14,6 +14,7 @@ init 90 python in _fom_presence_config:
 
     from store import persistent
     from store import _fom_presence as mod
+    from store import _fom_presence_util as util
     from store import _fom_presence_discord as discord
     from store import _fom_presence_error as error
     from store import _fom_presence_logging as logging
@@ -179,13 +180,28 @@ init 90 python in _fom_presence_config:
         """
 
         # NOTE: Discord just won't render timestamps that exceed 1 hour.
-        eve = _get_next_event(1)
+        eve = util.get_next_event(1)
         if eve is None:
             return None
         if eve[0].total_seconds() > 3600:
             return None
         return int(time.time() + eve[0].total_seconds())
     _timestamps_db["upcomingevent1h"] = _Supplier(_timestamp_upcoming_event_1h)
+
+    def _timestamp_last_update():
+        """
+        Supplier that provides timestamp of last meaningful presence update.
+
+        OUT:
+            int:
+                Unix timestamp of last presence update.
+        """
+
+        dt = mod.presence.last_meaningful_update
+        if dt is None:
+            return None
+        return _datetime_to_int(dt)
+    _timestamps_db["lastpresenceupdate"] = _Supplier(_timestamp_last_update)
 
 
     # ConfigParser wrapper and related functions and classes
