@@ -187,6 +187,21 @@ init 90 python in _fom_presence_config:
         return int(time.time() + eve[0].total_seconds())
     _timestamps_db["upcomingevent1h"] = _Supplier(_timestamp_upcoming_event_1h)
 
+    def _timestamp_last_update():
+        """
+        Supplier that provides timestamp of last meaningful presence update.
+
+        OUT:
+            int:
+                Unix timestamp of last presence update.
+        """
+
+        dt = mod.presence.last_meaningful_update
+        if dt is None:
+            return None
+        return _datetime_to_int(dt)
+    _timestamps_db["lastpresenceupdate"] = _Supplier(_timestamp_upcoming_event_1h)
+
 
     # ConfigParser wrapper and related functions and classes
 
