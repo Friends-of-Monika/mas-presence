@@ -15,18 +15,45 @@ Below you can see a table with default config files and their priorities for
 your convenience in finding a desired config and its priority without a need to
 dig up every single file.
 
+### Configs shown on topic
+
 | Priority | Config                                                                  |
 |----------|-------------------------------------------------------------------------|
 | -20      | topics/exp-previewer.conf                                               |
 | -20      | topics/floating-islands.conf                                            |
+
+### Configs shown on anniversary/milestone day
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -90      | events/anni-year-day.conf                                               |
 | -90      | events/anni-milestone-day.conf                                          |
+
+### Configs shown a week before anniversary/milestone
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -100     | events/anni-year.conf                                                   |
 | -100     | events/anni-milestone.conf                                              |
+
+### Configs shown on player's or Monika's birthday
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -190     | events/player-bday-day.conf                                             |
 | -190     | events/moni-bday-day.conf                                               |
+
+### Configs shown a week before player's or Monika's birthday
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -200     | events/player-bday.conf                                                 |
 | -200     | events/moni-bday.conf                                                   |
+
+### Configs shown during be right back idle
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -600     | be-right-backs/my-otter-self-brbs/stretching.conf                       |
 | -600     | be-right-backs/my-otter-self-brbs/stimulation.conf                      |
 | -600     | be-right-backs/my-otter-self-brbs/social.conf                           |
@@ -65,11 +92,36 @@ dig up every single file.
 | -600     | be-right-backs/genetechnician-reading-submod/reading_manga.conf         |
 | -600     | be-right-backs/genetechnician-reading-submod/reading_horror.conf        |
 | -600     | be-right-backs/genetechnician-reading-submod/reading_dystopian.conf     |
+
+### Config shown on a special date
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -790     | events/all-day.conf                                                     |
+
+### Config shown a week before special date
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -800     | events/all.conf                                                         |
+
+### Configs shown during night or morning
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -950     | time-of-day/night.conf                                                  |
 | -950     | time-of-day/morning.conf                                                |
+
+### Configs shown during specific weather
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -995     | weather/thunder.conf                                                    |
 | -995     | weather/snow.conf                                                       |
 | -995     | weather/rain.conf                                                       |
+
+### Default/fallback config
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
 | -1000    | default.conf                                                            |
