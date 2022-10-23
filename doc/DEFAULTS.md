@@ -18,6 +18,7 @@ dig up every single file.
 | Priority | Config                                                                  |
 |----------|-------------------------------------------------------------------------|
 | -20      | topics/exp-previewer.conf                                               |
+| -20      | topics/floating-islands.conf                                            |
 | -90      | events/anni-year-day.conf                                               |
 | -90      | events/anni-milestone-day.conf                                          |
 | -100     | events/anni-year.conf                                                   |
