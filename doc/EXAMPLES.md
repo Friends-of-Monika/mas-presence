@@ -55,3 +55,40 @@ Condition = mas_globals.time_of_day_4state == "morning"
 Priority = -950
 Dynamic = True
 ```
+
+## Weather based configuration
+
+Using `mas_current_weather` one can create a config that will be active when
+there is a certain type of weather in Monika's world:
+
+Here's list of currently available values (not that unlike in other examples,
+these are not strings, and they are deliberately written without quotes):
+* `mas_weather_def`
+* `mas_weather_rain`
+* `mas_weather_snow`
+* `mas_weather_thunder`
+* `mas_weaher_overcast`
+
+```ini
+[Presence]
+Condition = mas_current_weather == mas_weather_rain
+Priority = -995
+Dynamic = True
+```
+
+## Topic based configuration
+
+Using custom variable `event_label`, you can create a config that will be chosen
+as soon as player enters a certain topic. Here's how:
+
+```ini
+[Presence]
+Condition = event_label == "monika_hemispheres"
+Priority = -20
+Dynamic = True
+```
+
+There isn't a list of available values for this, but you can look into [Monika
+After Story](https://github.com/Monika-After-Story/MonikaModDev/blob/master/Monika%20After%20Story/game/script-topics.rpy#L868)
+source code and get event labels from there, as well as custom labels from
+submods.

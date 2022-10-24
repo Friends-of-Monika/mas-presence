@@ -14,6 +14,7 @@ init 90 python in _fom_presence_config:
 
     from store import persistent
     from store import _fom_presence as mod
+    from store import _fom_presence_util as util
     from store import _fom_presence_discord as discord
     from store import _fom_presence_error as error
     from store import _fom_presence_logging as logging
@@ -179,13 +180,28 @@ init 90 python in _fom_presence_config:
         """
 
         # NOTE: Discord just won't render timestamps that exceed 1 hour.
-        eve = _get_next_event(1)
+        eve = util.get_next_event(1)
         if eve is None:
             return None
         if eve[0].total_seconds() > 3600:
             return None
         return int(time.time() + eve[0].total_seconds())
     _timestamps_db["upcomingevent1h"] = _Supplier(_timestamp_upcoming_event_1h)
+
+    def _timestamp_last_update():
+        """
+        Supplier that provides timestamp of last meaningful presence update.
+
+        OUT:
+            int:
+                Unix timestamp of last presence update.
+        """
+
+        dt = mod.presence.last_meaningful_update
+        if dt is None:
+            return None
+        return _datetime_to_int(dt)
+    _timestamps_db["lastpresenceupdate"] = _Supplier(_timestamp_last_update)
 
 
     # ConfigParser wrapper and related functions and classes
@@ -467,8 +483,8 @@ init 90 python in _fom_presence_config:
         configs = dict()
         id_map = dict()
 
-        inherited = set()
-        overridden = set()
+        inherit_list = list()
+        override_map = dict()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
@@ -488,82 +504,88 @@ init 90 python in _fom_presence_config:
                         eval(config.condition, dict(), store.__dict__)
                     config._file = rel_file
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(file_rel, e)
+                    _ERROR_CONFIG_LOADING.report(rel_file, e)
                     continue
 
+                # Save config to config map by its path as map key.
                 configs[rel_file] = config
-                if config.id is None:
-                    config.id = rel_file
+                if config.id is not None:
+                    ov = id_map.get(config.id)
+                    if ov is not None:
+                        _WARNING_CONFIG_CLASH.report(rel_file, config.id)
 
-                ov = id_map.get(config.id)
-                if ov is not None:
-                    _WARNING_CONFIG_CLASH.report(rel_file, config.id)
+                # Build inheritance list (configs to perform inheritance on.)
+                if config.inherit_id is not None:
+                    inherit_list.append(config)
 
+                # Build override map (ID of config to override to list of configs
+                # willing to override.)
+                if config.override_id is not None:
+                    if config.override_id not in override_map:
+                        override_map[config.override_id] = [config]
+                    else:
+                        override_map[config.override_id].append(config)
+
+                # Populate ID map with desired ID and path.
                 id_map[config.id] = config
                 id_map[rel_file] = config
 
+        inherited = set()
+
         def inherit(config):
-            # Prevent loops and infinite recursions.
             if config in inherited:
                 return True
 
             if config.inherit_id is not None:
                 parent = id_map.get(config.inherit_id)
                 if parent is None:
-                    _ERROR_CONFIG_INHERITANCE.report(config.file, config.inherit_id)
+                    _ERROR_CONFIG_INHERITANCE.report(rel_file, config.id)
                     return False
 
-                # Inheritance is done recursively.
                 if not inherit(parent):
                     return False
                 config.copy_from(parent)
 
-            # Add to list of applied inheritances.
             inherited.add(config)
             return True
 
-        def override(config):
-            # Prevent loops and infinite recursions.
-            if config in overridden:
-                return True
-
-            if config.override_id is not None:
-                ov = id_map.get(config.override_id)
-                if ov is None:
-                    _ERROR_CONFIG_OVERRIDE.report(config.file, config.override_id)
-                    return False
-
-                if not override(ov):
-                    return False
-
-                remove_config(ov)
-                config.id = ov.id
-                id_map[ov.id] = config
-
-            overridden.add(config)
-            return True
-
-        def remove_config(config):
+        def remove(config):
             del configs[config.file]
+            del id_map[config.file]
             if config.id is not None:
                 del id_map[config.id]
 
-        for rel_file, config in list(configs.items()):
-            if rel_file not in configs:
+        # Apply overrides.
+        for _id, overrides in override_map.items():
+            target = id_map.get(_id)
+            if target is None:
+                _ERROR_CONFIG_OVERRIDE.report(overrides[0].file, _id)
                 continue
 
-            if not (inherit(config) and override(config)):
-                remove_config(config)
-                continue
+            overrides.sort(key=lambda it: it.priority, reverse=True)
+            for rem_conf in (overrides[1:] + [target]):
+                remove(rem_conf)
 
+            override = overrides[0]
+            override.id = _id
+            id_map[_id] = override
+
+        # Apply inheritance.
+        while len(inherit_list) > 0:
+            config = inherit_list.pop()
+            if not inherit(config):
+                remove(config)
+
+        # Re-populate config list with config list used locally.
         del _configs[:]
-        _config_id_map.clear()
-
         _configs.extend(list(configs.items()))
-        _config_id_map.update(id_map)
 
         # Sort configs on reload to save precious time on every loop.
         _configs.sort(key=lambda it: it[1].priority, reverse=True)
+
+        # Re-populate ID map.
+        _config_id_map.clear()
+        _config_id_map.update(id_map)
 
     def get_active_config():
         """

@@ -11,8 +11,9 @@ If you're looking for a way to override *default* config files, see
 
 If you feel like learning by example, you might as well look into `config/`
 folder which contains all maintained presence config files that are well
-commented and documented for your convenience and understanding. If you want to
-learn some theory though, here it is, right below.
+commented and documented for your convenience and understanding as well as
+[EXAMPLES.md](EXAMPLES.md) page. If you want to learn some theory though, here
+it is, right below.
 
 ## Basic principles
 
@@ -70,14 +71,18 @@ data, manage presence directly, etc.
 Discord Presence Submod ships with few extensions maintained by project creators
 and maintainers:
 
-* `fom-custom-vars.rpy` provides Custom Variables framework for registering and
+* `custom-vars.rpy` provides Custom Variables framework for registering and
   updating custom variables that can be used in expressions and interpolations.
-* `fom-events.rpy` provides custom variables related to upcoming calendar
+* `events.rpy` provides custom variables related to upcoming calendar
   events.
-* `fom-functions.rpy` provides custom functions that can be found useful in
+* `functions.rpy` provides custom functions that can be found useful in
   interpolations.
-* `fom-locations.rpy` provides custom variable for displaying currently active
+* `locations.rpy` provides custom variable for displaying currently active
   background.
+* `weather.rpy` provides custom variable for current weather detection.
+* `brbs.rpy` provides custom variable for current be right back detection.
+* `topics.rpy` provides custom variable and logic for detection of current
+  topic.
 
 ### Inheritance
 
@@ -155,6 +160,9 @@ to edit it, you can use a path (relative to config directory) instead:
 # but you only need part AFTER config/, without a leading slash (/)
 Override = default/configs/default.conf
 ```
+
+Taking possible override conflicts into account, if there are is more than one
+override existing for a certain config, one with higher priority prevails.
 
 ### Disabling
 
