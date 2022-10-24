@@ -504,7 +504,7 @@ init 90 python in _fom_presence_config:
                         eval(config.condition, dict(), store.__dict__)
                     config._file = rel_file
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(file_rel, e)
+                    _ERROR_CONFIG_LOADING.report(rel_file, e)
                     continue
 
                 # Save config to config map by its path as map key.
