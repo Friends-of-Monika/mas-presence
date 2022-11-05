@@ -15,6 +15,12 @@ Below you can see a table with default config files and their priorities for
 your convenience in finding a desired config and its priority without a need to
 dig up every single file.
 
+### Config shown when console is open
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
+| -20      | misc/console.conf                                                       |
+
 ### Configs shown on topic
 
 | Priority | Config                                                                  |
