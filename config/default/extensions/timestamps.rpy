@@ -94,6 +94,6 @@ init 190 python in fom_presence_extensions:
         if eve[0].total_seconds() > 3600:
             return None
         return int(time.time() + eve[0].total_seconds())
-    timestamps_db["upcomingevent1h"] = util.Supplier(_timestamp_upcoming_event_1h)
+    timestamps_db["upcomingevent1h"] = util.Supplier(_fom_timestamp_upcoming_event_1h)
 
 
