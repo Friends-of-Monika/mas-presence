@@ -117,7 +117,7 @@ init 90 python in _fom_presence_config:
             return None
         brb_ev = store.mas_getEV(store.mas_submod_utils.last_label)
         return _datetime_to_int(brb_ev.last_seen)
-    timestamps_db["berightbackstart"] = util.Supplier(_timestamp_session_start)
+    timestamps_db["berightbackstart"] = util.Supplier(_timestamp_brb_start)
 
     def _timestamp_last_update():
         """
