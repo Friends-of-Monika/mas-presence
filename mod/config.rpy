@@ -71,8 +71,8 @@ init 90 python in _fom_presence_config:
         return int(time.mktime(dt.timetuple()) + dt.microsecond / 1000000.0)
 
 
-    _timestamps_db = dict()
-    _timestamps_db["none"] = util.SUPPLY_NONE
+    timestamps_db = dict()
+    timestamps_db["none"] = util.SUPPLY_NONE
 
     def _parse_ts_supplier(s):
         """
@@ -90,7 +90,7 @@ init 90 python in _fom_presence_config:
                 If none found by the specified name.
         """
 
-        return _timestamps_db.get(s.lower())
+        return timestamps_db.get(s.lower())
 
     def _timestamp_session_start():
         """
@@ -102,7 +102,7 @@ init 90 python in _fom_presence_config:
         """
         return _datetime_to_int(persistent.sessions["current_session_start"])
 
-    _timestamps_db["sessionstart"] = util.Supplier(_timestamp_session_start)
+    timestamps_db["sessionstart"] = util.Supplier(_timestamp_session_start)
 
     def _timestamp_brb_start():
         brb_ev = store.mas_getEV(brb_evl)
@@ -129,7 +129,7 @@ init 90 python in _fom_presence_config:
         if eve[0].total_seconds() > 3600:
             return None
         return int(time.time() + eve[0].total_seconds())
-    _timestamps_db["upcomingevent1h"] = util.Supplier(_timestamp_upcoming_event_1h)
+    timestamps_db["upcomingevent1h"] = util.Supplier(_timestamp_upcoming_event_1h)
 
     def _timestamp_last_update():
         """
@@ -144,7 +144,7 @@ init 90 python in _fom_presence_config:
         if dt is None:
             return None
         return _datetime_to_int(dt)
-    _timestamps_db["lastpresenceupdate"] = util.Supplier(_timestamp_last_update)
+    timestamps_db["lastpresenceupdate"] = util.Supplier(_timestamp_last_update)
 
 
     # ConfigParser wrapper and related functions and classes
