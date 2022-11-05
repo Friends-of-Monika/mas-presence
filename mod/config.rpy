@@ -107,29 +107,7 @@ init 90 python in _fom_presence_config:
     def _timestamp_brb_start():
         brb_ev = store.mas_getEV(brb_evl)
         return brb_ev and brb_ev.last_seen
-
-    def _timestamp_upcoming_event_1h():
-        """
-        Supplier that provides upcoming event timestamp.
-
-        OUT:
-            int:
-                Unix timestamp of an upcoming event.
-
-        NOTE:
-            Due to Discord limitations regarding timestamps in activity, this
-            supplier does not return timestamps for events that are further than
-            one hour ahead.
-        """
-
-        # NOTE: Discord just won't render timestamps that exceed 1 hour.
-        eve = util.get_next_event(1)
-        if eve is None:
-            return None
-        if eve[0].total_seconds() > 3600:
-            return None
-        return int(time.time() + eve[0].total_seconds())
-    timestamps_db["upcomingevent1h"] = util.Supplier(_timestamp_upcoming_event_1h)
+    timestamps_db["berightbackstart"] = util.Supplier(_timestamp_session_start)
 
     def _timestamp_last_update():
         """
