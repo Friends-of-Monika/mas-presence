@@ -98,12 +98,15 @@ init 100 python in _fom_presence:
                 client.disconnect()
             self._connected = False
 
-        def update(self):
+        def update(self, with_config=None):
             if not self._check_all_connections():
                 self.disconnect()
                 return
 
-            prev_config, self._config = self._config, config.get_active_config()
+            if with_config is None:
+                with_config = config.get_active_config()
+
+            prev_config, self._config = self._config, with_config
             if self._config is None:
                 client.clear_activity()
                 return
@@ -211,6 +214,12 @@ init 100 python in _fom_presence:
                 presence.update()
             elif not presence.timeout_locked:
                 presence.connect()
+
+
+    # Runs when an event is called.
+    @store.mas_submod_utils.functionplugin("call_next_event", priority=100)
+    def on_event():
+        on_loop()
 
 
     # Runs on exit.

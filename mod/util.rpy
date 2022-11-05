@@ -115,74 +115,55 @@ init -1000 python in _fom_presence_util:
             return "/".join(parts)
 
 
-    def str_detitle(s):
+    class Supplier(object):
         """
-        Does the opposite of str.title() by converting first character in string
-        to its lowercase counterpart. If empty string is passed, an empty string
-        is returned correspondingly.
+        Supplier is a simple utility class that provides a way to dynamically
+        access certain data with some input in context.
+        """
+
+        def __init__(self, provide_func):
+            """
+            Creates a new supplier instance with the provided providing
+            function.
+
+            IN:
+                provide_func -> function:
+                    Function that will return requested data.
+            """
+
+            self._provide = provide_func
+
+        def get(self, *args, **kwargs):
+            """
+            Invoke providing function with passed parameters and get result.
+
+            IN:
+                *args:
+                    Arbitrary positional arguments to pass to function.
+
+            OUT:
+                any:
+                    Data returned by underlying providing function.
+            """
+
+            return self._provide(*args, **kwargs)
+
+    SUPPLY_NONE = Supplier(lambda: None)
+
+    def supply_subsitute(s):
+        """
+        Creates a supplier that will performs renpy.substitute on the provided
+        string every time its get(...) method is called.
 
         IN:
             s -> str:
-                String to convert first character of to lowercase.
+                String to perform substitution on.
 
         OUT:
-            str:
-                String with first charater in lowercase, or an empty string if
-                an empty string is passed.
+            Supplier:
+                Supplier that performs substitution on a string.
         """
 
-        if len(s) == 0:
-            return s
-        return s[0].lower() + s[1:]
-
-
-    def get_next_event(n_days):
-        """
-        Finds the closest calendar event within next N days. If none found,
-        returns None.
-
-        IN:
-            n_days -> int:
-                Amount of days to scan for upcoming events.
-
-        OUT:
-            Tuple of the following items:
-                [0]: amount of days until upcoming event
-                [1]: event prompt
-                [2]: event key
-                [3]: event starting date
-
-            None:
-                If no upcoming events were found.
-        """
-
-        events = list()
-
-        cur = datetime.date.today()
-        for i in range(n_days):
-            ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
-            for ev_key, ev_tup in ev_dict.items():
-                if ev_tup[0] == mas_calendar.CAL_TYPE_EV:
-                    ev = mas_getEV(ev_key)
-                    prompt = ev.prompt
-                    years = ev.years
-                    sd = ev.start_date
-
-                    if sd is not None and sd < datetime.datetime.now():
-                        continue
-
-                else:
-                    prompt = ev_tup[1]
-                    years = ev_tup[2]
-                    sd = datetime.datetime.min
-
-                if years is None or len(years) == 0 or cur.year in years:
-                    events.append((cur - datetime.date.today(), prompt, ev_key, sd))
-
-            cur += datetime.timedelta(days=1)
-
-        if len(events) == 0:
-            return None
-
-        events.sort(key=lambda it: it[3])
-        return events[0]
+        def supply():
+            return renpy.substitute(s)
+        return Supplier(supply)

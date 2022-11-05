@@ -27,7 +27,6 @@ init 200 python in fom_presence_extensions:
         else:
             value = item._eli[EventListItem.IDX_EVENT_LABEL]
         _cvars_export_var("event_label", value)
-        _fom_presence.on_loop()
 
     @store.mas_submod_utils.functionplugin("ch30_loop", priority=20)
     def _fom_ch30_loop():
