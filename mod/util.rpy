@@ -136,7 +136,7 @@ init -1000 python in _fom_presence_util:
         return s[0].lower() + s[1:]
 
 
-    def get_next_event(n_days):
+    def get_next_event(n_days, ignore_keys=None):
         """
         Finds the closest calendar event within next N days. If none found,
         returns None.
@@ -144,6 +144,9 @@ init -1000 python in _fom_presence_util:
         IN:
             n_days -> int:
                 Amount of days to scan for upcoming events.
+
+            ignore_keys -> list of str:
+                List of event keys to ignore.
 
         OUT:
             Tuple of the following items:
@@ -156,12 +159,18 @@ init -1000 python in _fom_presence_util:
                 If no upcoming events were found.
         """
 
+        if ignore_keys is None:
+            ignore_keys = list()
+
         events = list()
 
         cur = datetime.date.today()
         for i in range(n_days):
             ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
             for ev_key, ev_tup in ev_dict.items():
+                if ev_key in ignore_keys:
+                    continue
+
                 if ev_tup[0] == mas_calendar.CAL_TYPE_EV:
                     ev = mas_getEV(ev_key)
                     prompt = ev.prompt
