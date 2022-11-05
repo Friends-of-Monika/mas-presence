@@ -285,7 +285,7 @@ init 90 python in _fom_presence_config:
             self.large_image = parser.get_value("Assets", "LargeImage")
             self.large_text = parser.get_value("Assets", "LargeText", util.supply_subsitute, util.SUPPLY_NONE)
             self.small_image = parser.get_value("Assets", "SmallImage")
-            self.small_text = parser.get_value("Assets", "SmallText", _substitute_supplier, util.SUPPLY_NONE)
+            self.small_text = parser.get_value("Assets", "SmallText", util.supply_subsitute, util.SUPPLY_NONE)
 
             self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, util.SUPPLY_NONE)
             self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, util.SUPPLY_NONE)
