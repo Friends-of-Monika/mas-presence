@@ -113,6 +113,8 @@ init 90 python in _fom_presence_config:
                 Unix timestamp of be right back beginning.
         """
 
+        if not store.mas_globals.in_idle_mode:
+            return None
         brb_ev = store.mas_getEV(store.mas_submod_utils.last_label)
         return _datetime_to_int(brb_ev.last_seen)
     timestamps_db["berightbackstart"] = util.Supplier(_timestamp_session_start)
