@@ -47,10 +47,13 @@ init 200 python in fom_presence_extensions:
     from store import _fom_presence_util as util
 
 
+    events_ignore("milestone_personal_best")
+
+
     def _fom_update_eve_vars(n_days, suffix):
         _vars = dict()
 
-        next_eve = util.get_next_event(n_days)
+        next_eve = _fom_get_next_event(n_days)
         if next_eve is None:
             _vars["eve_days_{0}".format(suffix)] = None
             _vars["eve_prompt_{0}".format(suffix)] = None
