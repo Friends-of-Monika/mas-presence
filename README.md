@@ -14,7 +14,7 @@
   <a href="https://github.com/friends-of-monika/mas-presence/blob/main/LICENSE.txt">
     <img alt="MIT license badge" src="https://img.shields.io/badge/License-MIT-lightgrey.svg">
   </a>
-  <a href="https://mon.icu/discord">
+  <a href="https://dcache.me/discord">
     <img alt="Discord server" src="https://discordapp.com/api/guilds/1029849988953546802/widget.png?style=shield">
   </a>
   <a href="https://ko-fi.com/Y8Y15BC52">
