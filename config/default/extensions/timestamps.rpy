@@ -6,7 +6,9 @@
 init 190 python in fom_presence_extensions:
 
     import store
+
     from store import _fom_presence_config as config
+    from store import _fom_presence_util as util
 
 
     _fom_events_ignored = list()
