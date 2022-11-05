@@ -212,6 +212,7 @@ init 100 python in _fom_presence:
             elif not presence.timeout_locked:
                 presence.connect()
 
+
     # Runs when an event is called.
     @store.mas_submod_utils.functionplugin("call_next_event", priority=100)
     def on_event():
