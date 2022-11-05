@@ -83,6 +83,7 @@ and maintainers:
 * `brbs.rpy` provides custom variable for current be right back detection.
 * `topics.rpy` provides custom variable and logic for detection of current
   topic.
+* `timestamps.rpy` provides timestmaps to config.
 
 ### Inheritance
 
