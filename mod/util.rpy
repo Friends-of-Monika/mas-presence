@@ -195,3 +195,57 @@ init -1000 python in _fom_presence_util:
 
         events.sort(key=lambda it: it[3])
         return events[0]
+
+
+    class Supplier(object):
+        """
+        Supplier is a simple utility class that provides a way to dynamically
+        access certain data with some input in context.
+        """
+
+        def __init__(self, provide_func):
+            """
+            Creates a new supplier instance with the provided providing
+            function.
+
+            IN:
+                provide_func -> function:
+                    Function that will return requested data.
+            """
+
+            self._provide = provide_func
+
+        def get(self, *args, **kwargs):
+            """
+            Invoke providing function with passed parameters and get result.
+
+            IN:
+                *args:
+                    Arbitrary positional arguments to pass to function.
+
+            OUT:
+                any:
+                    Data returned by underlying providing function.
+            """
+
+            return self._provide(*args, **kwargs)
+
+    SUPPLY_NONE = Supplier(lambda: None)
+
+    def supply_subsitute(s):
+        """
+        Creates a supplier that will performs renpy.substitute on the provided
+        string every time its get(...) method is called.
+
+        IN:
+            s -> str:
+                String to perform substitution on.
+
+        OUT:
+            Supplier:
+                Supplier that performs substitution on a string.
+        """
+
+        def supply():
+            return renpy.substitute(s)
+        return Supplier(supply)

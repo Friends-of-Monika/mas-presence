@@ -54,63 +54,6 @@ init 90 python in _fom_presence_config:
     )
 
 
-    # Supplier and related functions and constructors
-
-    class _Supplier(object):
-        """
-        Supplier is a simple utility class that provides a way to dynamically
-        access certain data with some input in context.
-        """
-
-        def __init__(self, provide_func):
-            """
-            Creates a new supplier instance with the provided providing
-            function.
-
-            IN:
-                provide_func -> function:
-                    Function that will return requested data.
-            """
-
-            self._provide = provide_func
-
-        def get(self, *args, **kwargs):
-            """
-            Invoke providing function with passed parameters and get result.
-
-            IN:
-                *args:
-                    Arbitrary positional arguments to pass to function.
-
-            OUT:
-                any:
-                    Data returned by underlying providing function.
-            """
-
-            return self._provide(*args, **kwargs)
-
-    _none_supplier = _Supplier(lambda: None)
-
-    def _substitute_supplier(s):
-        """
-        Creates a supplier that will performs renpy.substitute on the provided
-        string every time its get(...) method is called.
-
-        IN:
-            s -> str:
-                String to perform substitution on.
-
-        OUT:
-            Supplier:
-                Supplier that performs substitution on a string.
-        """
-
-        def supply():
-            return renpy.substitute(s)
-        return _Supplier(supply)
-
-
-
     # Timestamps and related functions and variables
 
     def _datetime_to_int(dt):
@@ -129,7 +72,7 @@ init 90 python in _fom_presence_config:
 
 
     _timestamps_db = dict()
-    _timestamps_db["none"] = _none_supplier
+    _timestamps_db["none"] = util.SUPPLY_NONE
 
     def _parse_ts_supplier(s):
         """
@@ -159,7 +102,7 @@ init 90 python in _fom_presence_config:
         """
         return _datetime_to_int(persistent.sessions["current_session_start"])
 
-    _timestamps_db["sessionstart"] = _Supplier(_timestamp_session_start)
+    _timestamps_db["sessionstart"] = util.Supplier(_timestamp_session_start)
 
     def _timestamp_brb_start():
         brb_ev = store.mas_getEV(brb_evl)
@@ -186,7 +129,7 @@ init 90 python in _fom_presence_config:
         if eve[0].total_seconds() > 3600:
             return None
         return int(time.time() + eve[0].total_seconds())
-    _timestamps_db["upcomingevent1h"] = _Supplier(_timestamp_upcoming_event_1h)
+    _timestamps_db["upcomingevent1h"] = util.Supplier(_timestamp_upcoming_event_1h)
 
     def _timestamp_last_update():
         """
@@ -201,7 +144,7 @@ init 90 python in _fom_presence_config:
         if dt is None:
             return None
         return _datetime_to_int(dt)
-    _timestamps_db["lastpresenceupdate"] = _Supplier(_timestamp_last_update)
+    _timestamps_db["lastpresenceupdate"] = util.Supplier(_timestamp_last_update)
 
 
     # ConfigParser wrapper and related functions and classes
@@ -350,16 +293,16 @@ init 90 python in _fom_presence_config:
 
             self.app_id = parser.get_value("Client", "ApplicationID", int)
 
-            self.details = parser.get_value("Activity", "Details", _substitute_supplier, _none_supplier)
-            self.state = parser.get_value("Activity", "State", _substitute_supplier, _none_supplier)
+            self.details = parser.get_value("Activity", "Details", util.supply_subsitute, util.SUPPLY_NONE)
+            self.state = parser.get_value("Activity", "State", util.supply_subsitute, util.SUPPLY_NONE)
 
             self.large_image = parser.get_value("Assets", "LargeImage")
-            self.large_text = parser.get_value("Assets", "LargeText", _substitute_supplier, _none_supplier)
+            self.large_text = parser.get_value("Assets", "LargeText", util.supply_subsitute, util.SUPPLY_NONE)
             self.small_image = parser.get_value("Assets", "SmallImage")
-            self.small_text = parser.get_value("Assets", "SmallText", _substitute_supplier, _none_supplier)
+            self.small_text = parser.get_value("Assets", "SmallText", _substitute_supplier, util.SUPPLY_NONE)
 
-            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, _none_supplier)
-            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, _none_supplier)
+            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, util.SUPPLY_NONE)
+            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, util.SUPPLY_NONE)
 
             self._activity = None
             self._file = None
@@ -401,7 +344,7 @@ init 90 python in _fom_presence_config:
         def copy_from(self, config):
             """
             Copies values from another config (only omitted, None or
-            _none_supplier values) over to this config.
+            util.SUPPLY_NONE values) over to this config.
 
             IN:
                 config -> Config:
@@ -410,21 +353,21 @@ init 90 python in _fom_presence_config:
 
             if self.app_id is None:
                 self.app_id = config.app_id
-            if self.details is _none_supplier:
+            if self.details is util.SUPPLY_NONE:
                 self.details = config.details
-            if self.state is _none_supplier:
+            if self.state is util.SUPPLY_NONE:
                 self.state = config.state
             if self.large_image is None:
                 self.large_image = config.large_image
-            if self.large_text is _none_supplier:
+            if self.large_text is util.SUPPLY_NONE:
                 self.large_text = config.large_text
             if self.small_image is None:
                 self.small_image = config.small_image
-            if self.small_text is _none_supplier:
+            if self.small_text is util.SUPPLY_NONE:
                 self.small_text = config.small_text
-            if self.start_ts is _none_supplier:
+            if self.start_ts is util.SUPPLY_NONE:
                 self.start_ts = config.start_ts
-            if self.stop_ts is _none_supplier:
+            if self.stop_ts is util.SUPPLY_NONE:
                 self.stop_ts = config.stop_ts
 
         def to_activity(self):
