@@ -20,6 +20,8 @@ dig up every single file.
 | Priority | Config                                                                  |
 |----------|-------------------------------------------------------------------------|
 | -20      | topics/exp-previewer.conf                                               |
+| -20      | topics/say-something-say.conf                                           |
+| -20      | topics/say-something-pose.conf                                          |
 | -20      | topics/floating-islands.conf                                            |
 
 ### Configs shown on anniversary/milestone day
