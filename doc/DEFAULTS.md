@@ -21,6 +21,16 @@ dig up every single file.
 |----------|-------------------------------------------------------------------------|
 | -20      | misc/console.conf                                                       |
 
+### Configs shown on game
+
+| Priority | Config                                                                  |
+|----------|-------------------------------------------------------------------------|
+| -20      | games/hangman.conf                                                      |
+| -20      | games/chess.conf                                                        |
+| -20      | games/nou.conf                                                          |
+| -20      | games/piano.conf                                                        |
+| -20      | games/pong.conf                                                         |
+
 ### Configs shown on topic
 
 | Priority | Config                                                                  |
