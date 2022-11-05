@@ -9,6 +9,9 @@ init 190 python in fom_presence_extensions:
 
     from store import _fom_presence_config as config
     from store import _fom_presence_util as util
+    from store import mas_calendar, mas_getEV
+
+    import datetime
 
 
     _fom_events_ignored = list()
