@@ -71,19 +71,17 @@ data, manage presence directly, etc.
 Discord Presence Submod ships with few extensions maintained by project creators
 and maintainers:
 
-* `custom-vars.rpy` provides Custom Variables framework for registering and
-  updating custom variables that can be used in expressions and interpolations.
-* `events.rpy` provides custom variables related to upcoming calendar
-  events.
-* `functions.rpy` provides custom functions that can be found useful in
-  interpolations.
-* `locations.rpy` provides custom variable for displaying currently active
-  background.
-* `weather.rpy` provides custom variable for current weather detection.
-* `brbs.rpy` provides custom variable for current be right back detection.
-* `topics.rpy` provides custom variable and logic for detection of current
-  topic.
-* `timestamps.rpy` provides timestmaps to config.
+| Script            | Description                                                                                                                           |
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `custom-vars.rpy` | Provides Custom Variables framework for registering and updating custom variables that can be used in expressions and interpolations. |
+| `events.rpy`      | Provides custom variables related to upcoming calendar events.                                                                        |
+| `functions.rpy`   | Provides custom functions that can be found useful in interpolations.                                                                 |
+| `locations.rpy`   | Provides custom variable for displaying currently active background.                                                                  |
+| `weather.rpy`     | Provides custom variable for current weather detection.                                                                               |
+| `brbs.rpy`        | Provides custom variable for current be right back detection.                                                                         |
+| `topics.rpy`      | Provides custom variable and logic for detection of current topic.                                                                    |
+| `timestamps.rpy`  | Provides timestamps to config.                                                                                                        |
+| `console.rpy`     | Hooks into label callback and triggers misc/console.conf config.                                                                      |
 
 ### Inheritance
 
