@@ -53,6 +53,19 @@
       you admire floating islands scenery~
   * Contains custom variables extensions that can be used in text lines
 
+### 📑 Comparison with other submods
+
+| ⚙️ Submod             | 🏃 Startup time           | 🔧 Configuration                       | 🧬 Custom application ID |
+|-----------------------|---------------------------|----------------------------------------|--------------------------|
+| [Presence Submod][12] | ✔️ Starts right away      | 🔨 CONF-based,<br>free structured      | ✔️ Supported             |
+| [MAS RPC][5]          | ⏰ Takes up to one minute | 🪡 JSON-based,<br>strict structured    | ✔️ Supported             |
+
+| ⚙️ Submod             | 🕹️ Condition based displays                                                  | 🕑 Custom timestamps       | 🐍 Python and Ren'Py support  |
+|-----------------------|------------------------------------------------------------------------------|----------------------------|-------------------------------|
+| [Presence Submod][12] | 💃 Supports unlimited amount<br>of displays chosen based<br>on any condition | ⏰ Several premade options | 🎉 Python 2 & 3, Ren'Py 6 & 8 |
+| [MAS RPC][5]          | 🚶 Supports just be<br>right backs and custom<br>locations                   | 🏃 Only startup time       | 💤 Python 2, Ren'Py 6         |
+
+
 ## ❓ Installing
 
 1. Go to [the latest release page][6] and scroll to Assets section.
@@ -103,3 +116,4 @@ of Monika Discord server [here][9].
 [9]: https://mon.icu/discord
 [10]: https://discordapp.com/api/guilds/1029849988953546802/widget.png?style=banner3
 [11]: https://discordapp.com/api/guilds/970747033071804426/widget.png?style=banner3
+[12]: https://github.com/friends-of-monika/mas-presence
