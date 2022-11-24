@@ -99,11 +99,9 @@ release:
 
 ## 💬 Join our Discord
 
-We're up to chat! Come join submod author's Discord server [here][8] or come to chat at Friends
-of Monika Discord server [here][9].
+We're up to chat! Come join submod author's Discord server [here][8]].
 
 [![Discord server invitation][10]][8]
-[![Discord server invitation][11]][9]
 
 [1]: doc/CUSTOMIZING.md
 [2]: https://github.com/ImKventis
@@ -115,5 +113,4 @@ of Monika Discord server [here][9].
 [8]: https://dcache.me/discord
 [9]: https://mon.icu/discord
 [10]: https://discordapp.com/api/guilds/1029849988953546802/widget.png?style=banner3
-[11]: https://discordapp.com/api/guilds/970747033071804426/widget.png?style=banner3
 [12]: https://github.com/friends-of-monika/mas-presence
