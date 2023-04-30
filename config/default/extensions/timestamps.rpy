@@ -43,6 +43,8 @@ init 190 python in fom_presence_extensions:
 
         events = list()
 
+        _fom_presence_logging = store._fom_presence_logging
+
         cur = datetime.date.today()
         for i in range(n_days):
             ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
@@ -56,13 +58,13 @@ init 190 python in fom_presence_extensions:
                     years = ev.years
                     sd = ev.start_date
 
-                    if sd is not None and sd < datetime.datetime.now():
-                        continue
-
                 else:
                     prompt = ev_tup[1]
-                    years = ev_tup[2]
-                    sd = datetime.datetime.min
+                    years = ev_tup[2] or [cur.year]
+                    sd = datetime.datetime.combine(datetime.date(min(years), cur.month, cur.day), datetime.time())
+
+                if sd is not None and sd.date() < cur:
+                    continue
 
                 if years is None or len(years) == 0 or cur.year in years:
                     events.append((cur - datetime.date.today(), prompt, ev_key, sd))
