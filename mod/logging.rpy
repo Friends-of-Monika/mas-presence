@@ -87,4 +87,4 @@ init -100 python in _fom_presence_logging:
     # Whether to log every call made to Discord RPC along with its response and
     # duration. Verbose (a couple of lines every few seconds), but invaluable
     # for diagnosing connection issues.
-    TRACE = True
+    TRACE = False
