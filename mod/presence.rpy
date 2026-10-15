@@ -22,6 +22,7 @@ init -90 python in _fom_presence_discord:
     import uuid
     import errno
     import socket
+    import time
 
 
     # Constants
@@ -48,6 +49,10 @@ init -90 python in _fom_presence_discord:
     ## Socket timeout
 
     SOCK_TIMEOUT = 1
+
+    ## Interval between checks for incoming data on Windows named pipe
+
+    PIPE_POLL_INTERVAL = 0.01
 
 
     # Platform-specific approaches to IPC sockets (Unix) and pipes (Windows.)
@@ -153,12 +158,67 @@ init -90 python in _fom_presence_discord:
 
     ## Windows named pipe
 
+    def _win_load_pipe_available():
+        """
+        Loads PeekNamedPipe function from kernel32 using ctypes and returns a
+        function that tells how many bytes can be read from a pipe without
+        blocking. Reads from Windows named pipes cannot time out otherwise.
+
+        OUT:
+            function:
+                Function accepting pipe file object and returning amount of
+                bytes available for reading, raising IOError on failure (e.g.
+                if pipe was closed by Discord.)
+
+            None:
+                None is returned if ctypes or msvcrt could not be loaded.
+        """
+
+        try:
+            import ctypes
+            import msvcrt
+            from ctypes import wintypes
+
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            peek_named_pipe = kernel32.PeekNamedPipe
+            peek_named_pipe.argtypes = (
+                wintypes.HANDLE,  # hNamedPipe
+                wintypes.LPVOID,  # lpBuffer
+                wintypes.DWORD,   # nBufferSize
+                wintypes.LPVOID,  # lpBytesRead
+                ctypes.POINTER(wintypes.DWORD),  # lpTotalBytesAvail
+                wintypes.LPVOID   # lpBytesLeftThisMessage
+            )
+            peek_named_pipe.restype = wintypes.BOOL
+
+        except (ImportError, AttributeError, OSError, ValueError):
+            return None
+
+        def pipe_available(pipe):
+            available = wintypes.DWORD()
+            handle = msvcrt.get_osfhandle(pipe.fileno())
+            if not peek_named_pipe(handle, None, 0, None, ctypes.byref(available), None):
+                # WindowsError is not an IOError in Python 2, wrap it so that
+                # it is treated as protocol error.
+                code = ctypes.get_last_error()
+                raise IOError(code, ctypes.FormatError(code))
+            return available.value
+
+        return pipe_available
+
+    if platform.system() == "Windows":
+        _win_pipe_available = _win_load_pipe_available()
+    else:
+        _win_pipe_available = None
+
     class _WindowsSocket(object):
         """
         Windows implementation of Discord RPC socket using named pipe.
 
         Key differences from Unix implementation include "write" as "sendall"
-        and "read" as "recv."
+        and "read" as "recv." Reads time out after SOCK_TIMEOUT seconds like
+        Unix socket reads do, unless PeekNamedPipe could not be loaded, in which
+        case reads block until data arrives.
         """
 
         def __init__(self, socket):
@@ -168,7 +228,9 @@ init -90 python in _fom_presence_discord:
 
             IN:
                 socket -> file:
-                    File object to wrap.
+                    Unbuffered file object to wrap. It must be unbuffered, or
+                    else data already read into its buffer would not be seen
+                    by PeekNamedPipe and reads would time out.
             """
 
             self._sock = socket
@@ -182,7 +244,9 @@ init -90 python in _fom_presence_discord:
                     Array, list or any other iterable containing bytes to write.
             """
 
-            self._sock.write(data)
+            while data:
+                written = self._sock.write(data)
+                data = data[written:]
 
         def read(self, size):
             """
@@ -194,10 +258,48 @@ init -90 python in _fom_presence_discord:
 
             OUT:
                 bytes:
-                    Read buffer of data (size of 0 to size.)
+                    Read buffer of data (size of 0 to size, less than size only
+                    if pipe was closed.)
+
+            RAISES:
+                socket.timeout:
+                    If no data arrived in SOCK_TIMEOUT seconds.
             """
 
-            return self._sock.read(size)
+            deadline = None
+            if SOCK_TIMEOUT is not None:
+                deadline = time.time() + SOCK_TIMEOUT
+
+            data = b""
+            while len(data) < size:
+                if _win_pipe_available is not None:
+                    self._wait_readable(deadline)
+
+                chunk = self._sock.read(size - len(data))
+                if not chunk:
+                    break
+                data += chunk
+
+            return data
+
+        def _wait_readable(self, deadline):
+            """
+            Waits until there is data available for reading from the pipe.
+
+            IN:
+                deadline -> float or None:
+                    Time (as in time.time()) after which to give up waiting, or
+                    None to wait indefinitely.
+
+            RAISES:
+                socket.timeout:
+                    If no data arrived before deadline.
+            """
+
+            while _win_pipe_available(self._sock) == 0:
+                if deadline is not None and time.time() >= deadline:
+                    raise socket.timeout("timed out")
+                time.sleep(PIPE_POLL_INTERVAL)
 
         def close(self):
             """
@@ -228,7 +330,8 @@ init -90 python in _fom_presence_discord:
             sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
 
             try:
-                return _WindowsSocket(io.open(sock_path, "w+b"))
+                # Opened unbuffered, see _WindowsSocket constructor.
+                return _WindowsSocket(io.open(sock_path, "w+b", buffering=0))
 
             except IOError as e:
                 if e.errno not in (errno.EINVAL, errno.ENOENT):
