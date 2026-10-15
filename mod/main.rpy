@@ -65,7 +65,7 @@ init 100 python in _fom_presence:
         ui_message_resolve="Connection with Discord established."
     )
 
-    _ERROR_CLIENT_PINGING = error.Error(
+    _ERROR_CLIENT_LOST = error.Error(
         log_message_report="Connection with Discord lost: {0}.",
         log_message_resolve="Re-established connection with Discord.",
         ui_message_report="Connection with Discord lost. Trying to re-establish it...",
@@ -112,12 +112,9 @@ init 100 python in _fom_presence:
             return outcome
 
         def update(self, app_id, activity):
+            # NOTE: There is no separate liveness check (Discord clients do not
+            # ping Discord), responses to activity commands serve as one.
             outcome = _Outcome()
-            if not self._check_all_connections(outcome):
-                self.disconnect()
-                outcome.connected = False
-                return outcome
-
             self._show(app_id, activity, outcome)
             return outcome
 
@@ -138,7 +135,10 @@ init 100 python in _fom_presence:
                 if prev_client is not None:
                     try:
                         prev_client.clear_activity()
-                    except (discord.ProtocolError, discord.CallError) as e:
+                    except discord.ProtocolError as e:
+                        self._lose_connection(e, outcome)
+                        return
+                    except discord.CallError as e:
                         outcome.report(_ERROR_CLIENT_ACTIVITY, e)
 
             if app_id is None:
@@ -153,8 +153,18 @@ init 100 python in _fom_presence:
                 client.set_activity(activity)
                 self._active_app_id = app_id
                 outcome.resolve(_ERROR_CLIENT_ACTIVITY)
-            except (discord.ProtocolError, discord.CallError) as e:
+                outcome.resolve(_ERROR_CLIENT_LOST)
+            except discord.ProtocolError as e:
+                self._lose_connection(e, outcome)
+            except discord.CallError as e:
                 outcome.report(_ERROR_CLIENT_ACTIVITY, e)
+
+        def _lose_connection(self, e, outcome):
+            # Connection is unusable now (and may be out of sync if it timed
+            # out), so drop all clients; presence will reconnect on next loop.
+            outcome.report(_ERROR_CLIENT_LOST, e)
+            self.disconnect()
+            outcome.connected = False
 
         def _get_or_connect_client(self, app_id, outcome):
             client = self._clients.get(app_id)
@@ -207,17 +217,6 @@ init 100 python in _fom_presence:
             outcome.resolve(_ERROR_CLIENT_TIMEOUT)
             outcome.timeout_lock = False
             return rpc_socket
-
-        def _check_all_connections(self, outcome):
-            for client in self._clients.values():
-                try:
-                    client.ping()
-                except (discord.ProtocolError, discord.CallError) as e:
-                    outcome.report(_ERROR_CLIENT_PINGING, e)
-                    return False
-
-            outcome.resolve(_ERROR_CLIENT_PINGING)
-            return True
 
 
     class _PresenceController(object):
