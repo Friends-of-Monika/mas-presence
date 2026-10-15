@@ -14,6 +14,10 @@ init -90 python in _fom_presence_discord:
 
     # Imports
 
+    import store
+
+    from store import _fom_presence_logging as logging
+
     import platform
     import os
     import struct
@@ -146,14 +150,17 @@ init -90 python in _fom_presence_discord:
 
                 try:
                     sock.connect(sock_path)
+                    logging.DEFAULT.debug("Connected to Discord IPC socket {0}.".format(sock_path))
                     return _UnixSocket(sock)
                 except socket.error as e:
                     # If socket is unhandled (somehow), connection will fail
                     # with ECONNREFUSED. Just pass this socket and try to find
                     # another one.
+                    logging.DEFAULT.debug("Could not connect to Discord IPC socket {0}: {1!r}".format(sock_path, e))
                     if e.errno != errno.ECONNREFUSED:
                         raise
 
+        logging.DEFAULT.debug("No Discord IPC socket found in {0}.".format(base_path))
         return None
 
     ## Windows named pipe
@@ -191,8 +198,11 @@ init -90 python in _fom_presence_discord:
             )
             peek_named_pipe.restype = wintypes.BOOL
 
-        except (ImportError, AttributeError, OSError, ValueError):
+        except (ImportError, AttributeError, OSError, ValueError) as e:
+            logging.DEFAULT.warning("Could not load PeekNamedPipe, reads from Discord pipe will not time out: {0!r}".format(e))
             return None
+
+        logging.DEFAULT.debug("Loaded PeekNamedPipe, reads from Discord pipe will time out after {0}s.".format(SOCK_TIMEOUT))
 
         def pipe_available(pipe):
             available = wintypes.DWORD()
@@ -277,6 +287,7 @@ init -90 python in _fom_presence_discord:
 
                 chunk = self._sock.read(size - len(data))
                 if not chunk:
+                    logging.DEFAULT.debug("Discord pipe closed while reading ({0} of {1} bytes read.)".format(len(data), size))
                     break
                 data += chunk
 
@@ -298,6 +309,7 @@ init -90 python in _fom_presence_discord:
 
             while _win_pipe_available(self._sock) == 0:
                 if deadline is not None and time.time() >= deadline:
+                    logging.DEFAULT.debug("No data from Discord pipe in {0}s.".format(SOCK_TIMEOUT))
                     raise socket.timeout("timed out")
                 time.sleep(PIPE_POLL_INTERVAL)
 
@@ -331,22 +343,28 @@ init -90 python in _fom_presence_discord:
 
             try:
                 # Opened unbuffered, see _WindowsSocket constructor.
-                return _WindowsSocket(io.open(sock_path, "w+b", buffering=0))
+                pipe = _WindowsSocket(io.open(sock_path, "w+b", buffering=0))
+                logging.DEFAULT.debug("Connected to Discord IPC pipe {0}.".format(sock_path))
+                return pipe
 
             except IOError as e:
                 if e.errno not in (errno.EINVAL, errno.ENOENT):
                     # Only raise if we're not trying to open closed or
                     # nonexistent pipe for reading and writing.
+                    logging.DEFAULT.debug("Could not open Discord IPC pipe {0}: {1!r}".format(sock_path, e))
                     raise
 
+        logging.DEFAULT.debug("No Discord IPC pipe found in {0}.".format(base_path))
         return None
 
     ## get_rpc_socket function definition
 
     if platform.system() == "Windows":
         get_rpc_socket = _win_get_socket
+        logging.DEFAULT.debug("Using Windows named pipe for Discord IPC.")
     else:
         get_rpc_socket = _unix_get_socket
+        logging.DEFAULT.debug("Using Unix socket for Discord IPC.")
 
 
     # User activity wrapper class definitions
@@ -838,11 +856,16 @@ init -90 python in _fom_presence_discord:
                     CallError is raised when response received was erroneous.
             """
 
+            started_at = time.time()
             try:
                 packet.dump(self._sock)
                 rp = Packet.load(self._sock)
             except (struct.error, IOError) as e:
+                logging.DEFAULT.debug("Call {0!r} failed after {1:.3f}s: {2!r}".format(packet, time.time() - started_at, e))
                 raise ProtocolError(e)
+
+            if logging.TRACE:
+                logging.DEFAULT.debug("Call {0!r} returned {1!r} in {2:.3f}s.".format(packet, rp, time.time() - started_at))
 
             err = CallError.from_packet(rp)
             if err is not None:

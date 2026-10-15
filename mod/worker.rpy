@@ -42,6 +42,7 @@ init -90 python in _fom_presence_worker:
             self.result = None
             self.error = None
             self.traceback = None
+            self.duration = None
 
 
     class Worker(object):
@@ -56,15 +57,20 @@ init -90 python in _fom_presence_worker:
             the deque guarded with a condition variable.
         """
 
-        def __init__(self, name):
+        def __init__(self, name, logger=None):
             """
             Creates a new Worker instance and starts its thread.
 
             IN:
                 name -> str:
                     Name of the worker thread.
+
+                logger -> logger or None, default None:
+                    Logger to report worker thread lifecycle and errors to.
             """
 
+            self._name = name
+            self._logger = logger
             self._cond = threading.Condition(threading.Lock())
             self._pending = collections.deque()
             self._done = collections.deque()
@@ -191,6 +197,8 @@ init -90 python in _fom_presence_worker:
             Worker thread main loop.
             """
 
+            self._log("debug", "Worker thread {0} started.".format(self._name))
+
             while True:
                 with self._cond:
                     while not self._pending and not self._stopped:
@@ -210,6 +218,7 @@ init -90 python in _fom_presence_worker:
                     task.traceback = traceback.format_exc()
 
                 with self._cond:
+                    task.duration = time.time() - self._started_at
                     self._started_at = None
                     if not self._stopped:
                         self._done.append(task)
@@ -218,4 +227,21 @@ init -90 python in _fom_presence_worker:
                 try:
                     cleanup()
                 except Exception:
-                    pass
+                    self._log("error", "Worker thread {0} cleanup failed:\n{1}".format(self._name, traceback.format_exc()))
+
+            self._log("debug", "Worker thread {0} exited.".format(self._name))
+
+        def _log(self, level, message):
+            """
+            Logs message with the provided level if logger is set.
+
+            IN:
+                level -> str:
+                    Name of logger method to call (debug, info, etc.)
+
+                message -> str:
+                    Message to log.
+            """
+
+            if self._logger is not None:
+                getattr(self._logger, level)(message)

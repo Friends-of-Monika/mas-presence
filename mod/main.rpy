@@ -20,6 +20,7 @@ init 100 python in _fom_presence:
 
     import socket
     import datetime
+    import traceback
 
 
     _TIMEOUT_LOCK_DURATION = datetime.timedelta(seconds=45)
@@ -254,18 +255,24 @@ init 100 python in _fom_presence:
             return self._last_mean_update
 
         def connect(self):
-            if self._connecting or self.timeout_locked:
+            if self._connecting:
+                self._logger.debug("Not connecting to Discord: connection attempt already in progress.")
+                return
+            if self.timeout_locked:
+                self._logger.debug("Not connecting to Discord: connection attempts locked until {0}.".format(self._lock_conn_until))
                 return
 
             if self._config is None:
                 self._config = config.get_active_config()
                 if self._config is None:
+                    self._logger.debug("Not connecting to Discord: no active config.")
                     return
 
             if self._submit("connect", self._config):
                 self._connecting = True
 
         def disconnect(self):
+            self._logger.debug("Disconnecting from Discord.")
             self._epoch += 1
             self._connected = False
             self._connecting = False
@@ -296,7 +303,7 @@ init 100 python in _fom_presence:
 
             elapsed = self._worker.running_for()
             if elapsed is not None and elapsed > _HANG_TIMEOUT:
-                self._abandon_worker()
+                self._abandon_worker(elapsed)
 
         def shutdown(self):
             """
@@ -308,7 +315,10 @@ init 100 python in _fom_presence:
             self._connecting = False
 
             if self._worker is not None:
+                self._logger.debug("Shutting down Discord worker.")
                 self._worker.stop(cleanup=self._session.disconnect, timeout=_EXIT_TIMEOUT)
+                if self._worker.alive:
+                    self._logger.warning("Discord worker did not finish in {0}s, leaving it behind.".format(_EXIT_TIMEOUT))
                 self._worker = None
                 self._session = None
 
@@ -324,6 +334,9 @@ init 100 python in _fom_presence:
             context = error.current_context
             epoch = self._epoch
 
+            if logging.TRACE:
+                self._logger.debug("Submitting {0} (app ID {1}.)".format(op, app_id))
+
             return self._worker.submit(
                 lambda: func(app_id, activity),
                 lambda task: self._on_done(task, op, context, epoch),
@@ -336,10 +349,14 @@ init 100 python in _fom_presence:
                 self._connecting = False
 
             if task.error is not None:
-                self._logger.error("Unexpected error while communicating with Discord:\n" + task.traceback)
+                self._logger.error("Unexpected error while communicating with Discord ({0}):\n{1}".format(op, task.traceback))
                 return
 
             outcome = task.result
+            if logging.TRACE:
+                self._logger.debug("Finished {0} in {1:.3f}s (connected: {2}, timeout lock: {3}, current: {4}.)".format(
+                    op, task.duration, outcome.connected, outcome.timeout_lock, current
+                ))
             with error.temporary_context(context):
                 for func, args in outcome.errors:
                     func(*args)
@@ -348,6 +365,7 @@ init 100 python in _fom_presence:
                 self._set_timeout_lock(outcome.timeout_lock)
 
             if current and outcome.connected is not None and outcome.connected != self._connected:
+                self._logger.debug("Discord presence is now {0}.".format("connected" if outcome.connected else "disconnected"))
                 self._connected = outcome.connected
                 renpy.restart_interaction()
 
@@ -361,14 +379,17 @@ init 100 python in _fom_presence:
                 self._set_timeout_lock(True)
                 return False
 
-            self._worker = worker.Worker("fom_presence_discord")
+            self._worker = worker.Worker("fom_presence_discord", self._logger)
             self._session = _Session()
             return True
 
-        def _abandon_worker(self):
+        def _abandon_worker(self, elapsed):
             # The stuck call cannot be interrupted (and closing a Windows pipe
             # from another thread may block as well), so let the worker thread
             # clean up after itself if it ever unblocks and start over.
+            self._logger.warning("Discord worker stuck in a call for {0:.1f}s, abandoning it ({1} abandoned before.)".format(
+                elapsed, len(self._stuck_workers)
+            ))
             self._worker.stop(cleanup=self._session.disconnect)
             self._stuck_workers.append(self._worker)
             self._worker = None
@@ -384,6 +405,7 @@ init 100 python in _fom_presence:
 
         def _set_timeout_lock(self, lock):
             if lock:
+                self._logger.debug("Locking connection attempts for {0}s.".format(int(_TIMEOUT_LOCK_DURATION.total_seconds())))
                 self._lock_conn_until = datetime.datetime.now() + _TIMEOUT_LOCK_DURATION
             else:
                 self._lock_conn_until = None
@@ -396,16 +418,19 @@ init 100 python in _fom_presence:
     def _on_periodic():
         try:
             presence.poll()
-        except Exception as e:
-            logging.DEFAULT.error("Failed to process Discord presence results: {0}".format(e))
+        except Exception:
+            logging.DEFAULT.error("Failed to process Discord presence results:\n{0}".format(traceback.format_exc()))
 
     if hasattr(renpy.config, "periodic_callbacks"):
         renpy.config.periodic_callbacks.append(_on_periodic)
+    else:
+        logging.DEFAULT.warning("Ren'Py periodic callbacks are not available, Discord results will only be processed every few seconds.")
 
 
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=100)
     def on_preloop():
+        logging.DEFAULT.debug("Starting up (presence enabled: {0}.)".format(persistent._fom_presence_enabled))
         if persistent._fom_presence_enabled:
             config.reload_configs()
         if not presence.timeout_locked:
