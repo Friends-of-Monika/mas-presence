@@ -6,7 +6,7 @@ init 100 python in _fom_presence:
     from store import persistent
 
     from store import _fom_presence_config as config
-    from store import _fom_presence_error as error
+    from store import _fom_presence_status as status
     from store import _fom_presence_discord as discord
     from store import _fom_presence_logging as logging
     from store import _fom_presence_worker as worker
@@ -15,8 +15,14 @@ init 100 python in _fom_presence:
     import datetime
     import traceback
     import time
+    import math
 
-    _TIMEOUT_LOCK_DURATION = datetime.timedelta(seconds=45)
+    # Connection attempts are locked after timeouts and hangs with exponential
+    # backoff: lock duration starts at _BACKOFF_MIN seconds, doubles on each
+    # consecutive failure up to _BACKOFF_MAX seconds, and resets once a
+    # connection is established.
+    _BACKOFF_MIN = 5
+    _BACKOFF_MAX = 60
 
     # Time after which a Discord call still in progress is considered hung and
     # its worker is abandoned. Socket and pipe reads time out on their own well
@@ -35,44 +41,14 @@ init 100 python in _fom_presence:
     # callback (which itself is invoked approximately 20 times a second.)
     _POLL_INTERVAL = 1
 
+    # Minimum interval between automatic connection attempts while not
+    # connected (on top of timeout lock.)
+    _RETRY_INTERVAL = 5
 
-    _ERROR_SOCKET_NOT_FOUND = error.Error(
-        log_message_report="Could not connect to Discord Rich Presence. Is Discord running locally (not in browser?)",
-        log_message_resolve="Established connection with Discord Rich Presence."
-    )
 
-    _ERROR_CLIENT_CONNECTION = error.Error(
-        log_message_report="Could not connect to Discord RPC: {0}.",
-        log_message_resolve="Connection with Discord established.",
-        ui_message_report="Could not establish connection with Discord.",
-        ui_message_resolve="Connection with Discord established."
-    )
-
-    _ERROR_CLIENT_TIMEOUT = error.Error(
-        log_message_report="Timed out while connecting to Discord RPC.",
-        log_message_resolve="Connection with Discord established.",
-        ui_message_report="Discord connection timed out, further attempts will be possible in {0} seconds.".format(int(_TIMEOUT_LOCK_DURATION.total_seconds())),
-        ui_message_resolve="Connection with Discord established."
-    )
-
-    _ERROR_CLIENT_HUNG = error.Error(
-        log_message_report="Discord did not respond in {0} seconds, abandoning connection.",
-        log_message_resolve="Connection with Discord established.",
-        ui_message_report="Discord is not responding, further attempts will be possible in {0} seconds.".format(int(_TIMEOUT_LOCK_DURATION.total_seconds())),
-        ui_message_resolve="Connection with Discord established."
-    )
-
-    _ERROR_CLIENT_LOST = error.Error(
-        log_message_report="Connection with Discord lost: {0}.",
-        log_message_resolve="Re-established connection with Discord.",
-        ui_message_report="Connection with Discord lost. Trying to re-establish it...",
-        ui_message_resolve="Connection with Discord re-established."
-    )
-
-    _ERROR_CLIENT_ACTIVITY = error.Error(
-        log_message_report="Could not set activity: {0}",
-        ui_message_report="Could not set Rich Presence activity."
-    )
+    # Keys of problems shown in settings pane (see status.rpy.)
+    _STATUS_CONNECTION = "connection"
+    _STATUS_ACTIVITY = "activity"
 
 
     class _Outcome(object):
@@ -82,15 +58,25 @@ init 100 python in _fom_presence:
         """
 
         def __init__(self):
-            self.errors = []
+            self.status = []
             self.connected = None
             self.timeout_lock = None
 
-        def report(self, err, *args):
-            self.errors.append((err.report, args))
+        def set_status(self, key, ui_message, log_message=None, level=status.ERROR):
+            self.status.append((status.set, (key, ui_message, log_message, level)))
 
-        def resolve(self, err, *args):
-            self.errors.append((err.resolve, args))
+        def clear_status(self, key, log_message=None):
+            self.status.append((status.clear, (key, log_message)))
+
+        def connection_established(self):
+            self.clear_status(_STATUS_CONNECTION, "Connection with Discord established.")
+
+        def activity_failed(self, e):
+            self.set_status(
+                _STATUS_ACTIVITY,
+                "Could not set Rich Presence activity, see log/submod_log.log.",
+                "Could not set activity: {0}.".format(e)
+            )
 
 
     class _Session(object):
@@ -134,7 +120,7 @@ init 100 python in _fom_presence:
                         self._lose_connection(e, outcome)
                         return
                     except discord.CallError as e:
-                        outcome.report(_ERROR_CLIENT_ACTIVITY, e)
+                        outcome.activity_failed(e)
 
             if app_id is None:
                 return
@@ -147,17 +133,21 @@ init 100 python in _fom_presence:
             try:
                 client.set_activity(activity)
                 self._active_app_id = app_id
-                outcome.resolve(_ERROR_CLIENT_ACTIVITY)
-                outcome.resolve(_ERROR_CLIENT_LOST)
+                outcome.clear_status(_STATUS_ACTIVITY)
+                outcome.connection_established()
             except discord.ProtocolError as e:
                 self._lose_connection(e, outcome)
             except discord.CallError as e:
-                outcome.report(_ERROR_CLIENT_ACTIVITY, e)
+                outcome.activity_failed(e)
 
         def _lose_connection(self, e, outcome):
             # Connection is unusable now (and may be out of sync if it timed
             # out), so drop all clients; presence will reconnect on next loop.
-            outcome.report(_ERROR_CLIENT_LOST, e)
+            outcome.set_status(
+                _STATUS_CONNECTION,
+                "Connection with Discord lost.",
+                "Connection with Discord lost: {0}.".format(e)
+            )
             self.disconnect()
             outcome.connected = False
 
@@ -173,9 +163,7 @@ init 100 python in _fom_presence:
             try:
                 client = discord.Client(rpc_socket)
                 client.handshake(app_id)
-                outcome.resolve(_ERROR_CLIENT_TIMEOUT)
-                outcome.resolve(_ERROR_CLIENT_HUNG)
-                outcome.resolve(_ERROR_CLIENT_CONNECTION)
+                outcome.connection_established()
                 outcome.timeout_lock = False
             except (discord.ProtocolError, discord.CallError) as e:
                 try:
@@ -184,10 +172,9 @@ init 100 python in _fom_presence:
                     pass
 
                 if isinstance(e, discord.ProtocolError) and isinstance(e.args[0], socket.timeout):
-                    outcome.report(_ERROR_CLIENT_TIMEOUT)
-                    outcome.timeout_lock = True
+                    self._timed_out(outcome)
                 else:
-                    outcome.report(_ERROR_CLIENT_CONNECTION, e)
+                    self._connection_failed(e, outcome)
                 return None
 
             self._clients[app_id] = client
@@ -197,21 +184,37 @@ init 100 python in _fom_presence:
             try:
                 rpc_socket = discord.get_rpc_socket()
             except socket.timeout:
-                outcome.timeout_lock = True
-                outcome.report(_ERROR_CLIENT_TIMEOUT)
+                self._timed_out(outcome)
                 return None
             except (IOError, OSError) as e:
-                outcome.report(_ERROR_CLIENT_CONNECTION, e)
+                self._connection_failed(e, outcome)
                 return None
 
             if rpc_socket is None:
-                outcome.report(_ERROR_SOCKET_NOT_FOUND)
+                outcome.set_status(
+                    _STATUS_CONNECTION,
+                    "Discord is not running (desktop app is required.)",
+                    "Could not connect to Discord Rich Presence. Is Discord running locally (not in browser?)",
+                    status.WARNING
+                )
                 return None
 
-            outcome.resolve(_ERROR_SOCKET_NOT_FOUND)
-            outcome.resolve(_ERROR_CLIENT_TIMEOUT)
-            outcome.timeout_lock = False
             return rpc_socket
+
+        def _timed_out(self, outcome):
+            outcome.set_status(
+                _STATUS_CONNECTION,
+                "Connection with Discord timed out.",
+                "Timed out while connecting to Discord RPC."
+            )
+            outcome.timeout_lock = True
+
+        def _connection_failed(self, e, outcome):
+            outcome.set_status(
+                _STATUS_CONNECTION,
+                "Could not connect to Discord.",
+                "Could not connect to Discord RPC: {0}.".format(e)
+            )
 
 
     class _PresenceController(object):
@@ -227,6 +230,8 @@ init 100 python in _fom_presence:
             self._connecting = False
             self._config = None
             self._lock_conn_until = None
+            self._lock_failures = 0
+            self._last_attempt = None
             self._last_mean_update = None
             self._worker = None
             self._session = None
@@ -241,14 +246,45 @@ init 100 python in _fom_presence:
             return self._connected
 
         @property
+        def connecting(self):
+            return self._connecting
+
+        @property
         def timeout_locked(self):
             return self._lock_conn_until is not None and self._lock_conn_until > datetime.datetime.now()
+
+        @property
+        def retry_in(self):
+            """
+            Seconds (rounded up) until next automatic connection attempt, zero
+            if it is due, or None if connected or connecting.
+            """
+
+            if self._connected or self._connecting:
+                return None
+
+            remaining = 0
+            if self._last_attempt is not None:
+                remaining = _RETRY_INTERVAL - (time.time() - self._last_attempt)
+            if self.timeout_locked:
+                remaining = max(remaining, (self._lock_conn_until - datetime.datetime.now()).total_seconds())
+            return max(0, int(math.ceil(remaining)))
+
+        def reconnect_if_due(self):
+            """
+            Starts a connection attempt if not connected and retry interval and
+            timeout lock have elapsed.
+            """
+
+            if self.retry_in == 0:
+                self.connect()
 
         @property
         def last_meaningful_update(self):
             return self._last_mean_update
 
         def connect(self):
+            self._last_attempt = time.time()
             if self._connecting:
                 self._logger.debug("Not connecting to Discord: connection attempt already in progress.")
                 return
@@ -270,6 +306,9 @@ init 100 python in _fom_presence:
             self._epoch += 1
             self._connected = False
             self._connecting = False
+
+            status.clear(_STATUS_CONNECTION)
+            status.clear(_STATUS_ACTIVITY)
 
             if self._worker is not None:
                 self._worker.submit(self._session.disconnect)
@@ -325,7 +364,6 @@ init 100 python in _fom_presence:
                 app_id, activity = with_config.app_id, with_config.to_activity()
 
             func = getattr(self._session, op)
-            context = error.current_context
             epoch = self._epoch
 
             if logging.TRACE:
@@ -333,14 +371,15 @@ init 100 python in _fom_presence:
 
             return self._worker.submit(
                 lambda: func(app_id, activity),
-                lambda task: self._on_done(task, op, context, epoch),
+                lambda task: self._on_done(task, op, epoch),
                 key=key
             )
 
-        def _on_done(self, task, op, context, epoch):
+        def _on_done(self, task, op, epoch):
             current = epoch == self._epoch
             if current and op == "connect":
                 self._connecting = False
+                renpy.restart_interaction()
 
             if task.error is not None:
                 self._logger.error("Unexpected error while communicating with Discord ({0}):\n{1}".format(op, task.traceback))
@@ -351,8 +390,10 @@ init 100 python in _fom_presence:
                 self._logger.debug("Finished {0} in {1:.3f}s (connected: {2}, timeout lock: {3}, current: {4}.)".format(
                     op, task.duration, outcome.connected, outcome.timeout_lock, current
                 ))
-            with error.temporary_context(context):
-                for func, args in outcome.errors:
+
+            # Status of operations submitted before last disconnect is stale.
+            if current:
+                for func, args in outcome.status:
                     func(*args)
 
             if outcome.timeout_lock is not None:
@@ -394,15 +435,22 @@ init 100 python in _fom_presence:
             self._connected = False
             self._connecting = False
 
-            _ERROR_CLIENT_HUNG.report(_HANG_TIMEOUT)
+            status.set(
+                _STATUS_CONNECTION,
+                "Discord is not responding.",
+                "Discord did not respond in {0} seconds, abandoning connection.".format(_HANG_TIMEOUT)
+            )
             self._set_timeout_lock(True)
             renpy.restart_interaction()
 
         def _set_timeout_lock(self, lock):
             if lock:
-                self._logger.debug("Locking connection attempts for {0}s.".format(int(_TIMEOUT_LOCK_DURATION.total_seconds())))
-                self._lock_conn_until = datetime.datetime.now() + _TIMEOUT_LOCK_DURATION
+                duration = min(_BACKOFF_MIN * 2 ** min(self._lock_failures, 16), _BACKOFF_MAX)
+                self._lock_failures += 1
+                self._logger.debug("Locking connection attempts for {0}s ({1} consecutive failures.)".format(duration, self._lock_failures))
+                self._lock_conn_until = datetime.datetime.now() + datetime.timedelta(seconds=duration)
             else:
+                self._lock_failures = 0
                 self._lock_conn_until = None
 
 
@@ -410,6 +458,10 @@ init 100 python in _fom_presence:
 
 
     _last_periodic_poll = 0
+
+    # Set once ch30_preloop has run; configs (and store variables their
+    # conditions depend on) are not ready before that.
+    _started = False
 
     # Runs on the main thread approximately 20 times a second, but only polls
     # once per _POLL_INTERVAL seconds.
@@ -423,6 +475,8 @@ init 100 python in _fom_presence:
 
         try:
             presence.poll()
+            if _started and persistent._fom_presence_enabled:
+                presence.reconnect_if_due()
         except Exception:
             logging.DEFAULT.error("Failed to process Discord presence results:\n{0}".format(traceback.format_exc()))
 
@@ -435,6 +489,9 @@ init 100 python in _fom_presence:
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=100)
     def on_preloop():
+        global _started
+        _started = True
+
         logging.DEFAULT.debug("Starting up (presence enabled: {0}.)".format(persistent._fom_presence_enabled))
         if persistent._fom_presence_enabled:
             config.reload_configs()
@@ -449,8 +506,8 @@ init 100 python in _fom_presence:
         if persistent._fom_presence_enabled:
             if presence.connected:
                 presence.update()
-            elif not presence.timeout_locked:
-                presence.connect()
+            else:
+                presence.reconnect_if_due()
 
 
     # Runs when an event is called.

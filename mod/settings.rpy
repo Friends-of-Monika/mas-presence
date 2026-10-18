@@ -44,6 +44,22 @@ init 100:
                         hovered SetField(tooltip, "value", "Reload presence configs.")
                         unhovered SetField(tooltip, "value", tooltip.default)
 
+            null height 10
+
+            text _fom_presence_settings.get_headline():
+                style "main_menu_version"
+                substitute False
+
+            for _key, _level, _message in _fom_presence_status.entries():
+                text _fom_presence_settings.escape_text(_message):
+                    style "main_menu_version"
+                    color _fom_presence_settings.LEVEL_COLORS[_level]
+                    substitute False
+
+        # Keep retry countdown in headline ticking.
+        if persistent._fom_presence_enabled and not _fom_presence.presence.connected:
+            timer 1.0 repeat True action Function(renpy.restart_interaction)
+
 
 init 100 python in _fom_presence_settings:
 
@@ -52,27 +68,53 @@ init 100 python in _fom_presence_settings:
     from store import persistent
     from store import _fom_presence as mod
     from store import _fom_presence_config as config
-    from store import _fom_presence_error as error
+    from store import _fom_presence_status as status
+
+
+    LEVEL_COLORS = {
+        status.WARNING: "#d98c00",
+        status.ERROR: "#d63a3a"
+    }
 
 
     def toggle():
-        with error.temporary_context(error.OPTIONS_CONTEXT):
-            persistent._fom_presence_enabled = not persistent._fom_presence_enabled
-            if not persistent._fom_presence_enabled and mod.presence.connected:
-                mod.presence.disconnect()
-            elif persistent._fom_presence_enabled and not mod.presence.connected:
-                mod.presence.connect()
-
-    def reconnect():
-        with error.temporary_context(error.OPTIONS_CONTEXT):
-            if mod.presence.connected:
-                mod.presence.disconnect()
+        persistent._fom_presence_enabled = not persistent._fom_presence_enabled
+        if not persistent._fom_presence_enabled:
+            mod.presence.disconnect()
+        elif not mod.presence.connected:
             mod.presence.connect()
 
+    def reconnect():
+        if mod.presence.connected:
+            mod.presence.disconnect()
+        mod.presence.connect()
+
     def reload_activity():
-        with error.temporary_context(error.OPTIONS_CONTEXT):
-            mod.presence.update()
+        mod.presence.update()
 
     def reload_configs():
-        with error.temporary_context(error.OPTIONS_CONTEXT):
-            config.reload_configs()
+        config.reload_configs()
+
+    def get_headline():
+        """
+        Returns status headline displayed in settings pane.
+        """
+
+        if not persistent._fom_presence_enabled:
+            return "Status: disabled"
+        if mod.presence.connected:
+            return "Status: connected"
+        if mod.presence.connecting:
+            return "Status: connecting..."
+
+        remaining = mod.presence.retry_in
+        if remaining:
+            return "Status: not connected, retrying in {0} seconds".format(remaining)
+        return "Status: not connected, retrying..."
+
+    def escape_text(message):
+        """
+        Escapes Ren'Py text tags in message (e.g. from exception messages.)
+        """
+
+        return message.replace("{", "{{")

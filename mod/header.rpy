@@ -6,7 +6,7 @@ init -990 python in mas_submod_utils:
         author="Friends of Monika",
         name="Discord Presence Submod",
         description="Show everyone who's the person you're spending your time with~",
-        version="0.4.1",
+        version="0.5.0",
         settings_pane="fom_presence_settings_pane",
         version_updates={
             "friends_of_monika_discord_presence_submod_v0_0_1": "friends_of_monika_discord_presence_submod_v0_0_2",
@@ -17,7 +17,10 @@ init -990 python in mas_submod_utils:
             "friends_of_monika_discord_presence_submod_v0_2_0": "friends_of_monika_discord_presence_submod_v0_2_1",
             "friends_of_monika_discord_presence_submod_v0_2_1": "friends_of_monika_discord_presence_submod_v0_3_0",
             "friends_of_monika_discord_presence_submod_v0_3_0": "friends_of_monika_discord_presence_submod_v0_3_1",
-            "friends_of_monika_discord_presence_submod_v0_3_1": "friends_of_monika_discord_presence_submod_v0_3_2"
+            "friends_of_monika_discord_presence_submod_v0_3_1": "friends_of_monika_discord_presence_submod_v0_3_2",
+            "friends_of_monika_discord_presence_submod_v0_3_2": "friends_of_monika_discord_presence_submod_v0_4_0",
+            "friends_of_monika_discord_presence_submod_v0_4_0": "friends_of_monika_discord_presence_submod_v0_4_1",
+            "friends_of_monika_discord_presence_submod_v0_4_1": "friends_of_monika_discord_presence_submod_v0_5_0"
         }
     )
 

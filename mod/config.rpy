@@ -10,7 +10,7 @@ init 90 python in _fom_presence_config:
     from store import _fom_presence as mod
     from store import _fom_presence_util as util
     from store import _fom_presence_discord as discord
-    from store import _fom_presence_error as error
+    from store import _fom_presence_status as status
     from store import _fom_presence_logging as logging
 
     import sys
@@ -24,28 +24,15 @@ init 90 python in _fom_presence_config:
         import configparser
 
 
-    # Errors and warnings
+    # Problems shown in settings pane (see status.rpy)
 
-    _ERROR_CONFIG_LOADING = error.Error(
-        log_message_report="Could not load presence config from file {0}: {1}.",
-        ui_message_report="Could not load some presence configs, see log/submod_log.log."
-    )
+    _STATUS_CONFIG_PREFIX = "config:"
 
-    _ERROR_CONFIG_INHERITANCE = error.Error(
-        log_message_report="Presence config {0} inherits nonexistent config ID: {1}.",
-        ui_message_report="Could not load some presence configs, see log/submod_log.log."
-    )
-
-    _ERROR_CONFIG_OVERRIDE = error.Error(
-        log_message_report="Presence config {0} overrides nonexistent config ID: {1}.",
-        ui_message_report="Could not load some presence configs, see log/submod_log.log."
-    )
-
-    _WARNING_CONFIG_CLASH = error.Error(
-        log_message_report="Config from file {0} has conflicting name with some other config: {1}.",
-        ui_message_report="There were some warnings during loading some of the presence configs, see log/submod_log.log.",
-        warning=True
-    )
+    def _report_config_problem(kind, rel_file, ui_message, log_message, level=status.ERROR):
+        status.set(
+            "{0}{1}:{2}".format(_STATUS_CONFIG_PREFIX, kind, rel_file),
+            ui_message, log_message, level
+        )
 
 
     # Timestamps and related functions and variables
@@ -401,9 +388,11 @@ init 90 python in _fom_presence_config:
         Clears global _configs variable and populates it with new valid configs.
 
         NOTE:
-            All errors will be reported using Error objects in global current
-            error context. Reported errors are not resolved on successful loads.
+            Problems are reported to status module; problems reported on
+            previous loads are cleared.
         """
+
+        status.clear_prefix(_STATUS_CONFIG_PREFIX)
 
         configs = dict()
         id_map = dict()
@@ -429,7 +418,11 @@ init 90 python in _fom_presence_config:
                         eval(config.condition, dict(), store.__dict__)
                     config._file = rel_file
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(rel_file, e)
+                    _report_config_problem(
+                        "loading", rel_file,
+                        "Could not load config {0}, see log/submod_log.log.".format(rel_file),
+                        "Could not load presence config from file {0}: {1}.".format(rel_file, e)
+                    )
                     continue
 
                 # Save config to config map by its path as map key.
@@ -437,7 +430,12 @@ init 90 python in _fom_presence_config:
                 if config.id is not None:
                     ov = id_map.get(config.id)
                     if ov is not None:
-                        _WARNING_CONFIG_CLASH.report(rel_file, config.id)
+                        _report_config_problem(
+                            "clash", rel_file,
+                            "Config {0} has conflicting ID {1}.".format(rel_file, config.id),
+                            "Config from file {0} has conflicting ID with some other config: {1}.".format(rel_file, config.id),
+                            status.WARNING
+                        )
 
                 # Build inheritance list (configs to perform inheritance on.)
                 if config.inherit_id is not None:
@@ -464,7 +462,11 @@ init 90 python in _fom_presence_config:
             if config.inherit_id is not None:
                 parent = id_map.get(config.inherit_id)
                 if parent is None:
-                    _ERROR_CONFIG_INHERITANCE.report(rel_file, config.id)
+                    _report_config_problem(
+                        "inheritance", config.file,
+                        "Config {0} inherits unknown config ID {1}.".format(config.file, config.inherit_id),
+                        "Presence config {0} inherits nonexistent config ID: {1}.".format(config.file, config.inherit_id)
+                    )
                     return False
 
                 if not inherit(parent):
@@ -484,7 +486,11 @@ init 90 python in _fom_presence_config:
         for _id, overrides in override_map.items():
             target = id_map.get(_id)
             if target is None:
-                _ERROR_CONFIG_OVERRIDE.report(overrides[0].file, _id)
+                _report_config_problem(
+                    "override", overrides[0].file,
+                    "Config {0} overrides unknown config ID {1}.".format(overrides[0].file, _id),
+                    "Presence config {0} overrides nonexistent config ID: {1}.".format(overrides[0].file, _id)
+                )
                 continue
 
             overrides.sort(key=lambda it: it.priority, reverse=True)
@@ -519,17 +525,25 @@ init 90 python in _fom_presence_config:
         evaluated to True.
 
         NOTE:
-            All errors will be reported using Error objects in global current
-            error context. Reported errors are not resolved on successful loads.
+            Condition evaluation problems are reported to status module and
+            cleared once the condition evaluates successfully again.
         """
 
-        for _file, conf in _configs:
+        for rel_file, conf in _configs:
             if not conf.disable and conf.condition is not None:
                 try:
-                    if bool(eval(conf.condition, dict(), store.__dict__)):
-                        return conf
+                    result = bool(eval(conf.condition, dict(), store.__dict__))
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
+                    _report_config_problem(
+                        "condition", rel_file,
+                        "Could not evaluate condition of config {0}, see log/submod_log.log.".format(rel_file),
+                        "Could not evaluate condition of presence config {0}: {1}.".format(rel_file, e)
+                    )
+                    continue
+
+                status.clear("{0}condition:{1}".format(_STATUS_CONFIG_PREFIX, rel_file))
+                if result:
+                    return conf
 
         return None
 
