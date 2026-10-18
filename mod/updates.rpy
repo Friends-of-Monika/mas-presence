@@ -80,3 +80,27 @@ label friends_of_monika_discord_presence_submod_v0_3_1(version="v0_3_1"):
 
 label friends_of_monika_discord_presence_submod_v0_3_2(version="v0_3_2"):
     return
+
+label friends_of_monika_discord_presence_submod_v0_4_0(version="v0_4_0"):
+    return
+
+label friends_of_monika_discord_presence_submod_v0_4_1(version="v0_4_1"):
+    return
+
+label friends_of_monika_discord_presence_submod_v0_5_0(version="v0_5_0"):
+    python:
+        def _migrate_friends_of_monika_discord_presence_submod_v0_5_0():
+            import os
+
+            # error.rpy was replaced with status.rpy.
+            for name in ("error.rpy", "error.rpyc"):
+                try:
+                    os.remove(os.path.join(store._fom_presence.basedir, name))
+                except OSError:
+                    pass
+
+        # Run migration function and delete it not to litter the global scope.
+        _migrate_friends_of_monika_discord_presence_submod_v0_5_0()
+        del _migrate_friends_of_monika_discord_presence_submod_v0_5_0
+
+    return
