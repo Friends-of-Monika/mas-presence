@@ -16,6 +16,7 @@ init 90 python in _fom_presence_config:
     import sys
     import os
     import time
+    import traceback
 
     if sys.version_info.major == 2:
         import ConfigParser as configparser
@@ -386,6 +387,7 @@ init 90 python in _fom_presence_config:
     def reload_configs():
         """
         Clears global _configs variable and populates it with new valid configs.
+        If reloading fails unexpectedly, previously loaded configs are kept.
 
         NOTE:
             Problems are reported to status module; problems reported on
@@ -394,10 +396,44 @@ init 90 python in _fom_presence_config:
 
         status.clear_prefix(_STATUS_CONFIG_PREFIX)
 
+        try:
+            configs, id_map = _load_configs()
+        except Exception:
+            logging.DEFAULT.error("Could not reload presence configs:\n{0}".format(traceback.format_exc()))
+            status.set(
+                _STATUS_CONFIG_PREFIX + "reload",
+                "Could not reload configs, see log/submod_log.log."
+            )
+            return
+
+        # Re-populate config list with config list used locally.
+        del _configs[:]
+        _configs.extend(list(configs.items()))
+
+        # Sort configs on reload to save precious time on every loop.
+        _configs.sort(key=lambda it: it[1].priority, reverse=True)
+
+        # Re-populate ID map.
+        _config_id_map.clear()
+        _config_id_map.update(id_map)
+
+    def _load_configs():
+        """
+        Loads configs from config directory and applies overrides and
+        inheritance.
+
+        OUT:
+            tuple of (configs, id_map):
+                configs -> dict:
+                    Map of config path (relative to config directory) to
+                    Config instance.
+
+                id_map -> dict:
+                    Map of config ID and config path to Config instance.
+        """
+
         configs = dict()
         id_map = dict()
-
-        inherit_list = list()
         override_map = dict()
 
         for _dir, _, files in os.walk(_config_dir):
@@ -428,59 +464,35 @@ init 90 python in _fom_presence_config:
                 # Save config to config map by its path as map key.
                 configs[rel_file] = config
                 if config.id is not None:
-                    ov = id_map.get(config.id)
-                    if ov is not None:
+                    if config.id in id_map:
                         _report_config_problem(
                             "clash", rel_file,
                             "Config {0} has conflicting ID {1}.".format(rel_file, config.id),
                             "Config from file {0} has conflicting ID with some other config: {1}.".format(rel_file, config.id),
                             status.WARNING
                         )
-
-                # Build inheritance list (configs to perform inheritance on.)
-                if config.inherit_id is not None:
-                    inherit_list.append(config)
+                    id_map[config.id] = config
 
                 # Build override map (ID of config to override to list of configs
                 # willing to override.)
                 if config.override_id is not None:
-                    if config.override_id not in override_map:
-                        override_map[config.override_id] = [config]
-                    else:
-                        override_map[config.override_id].append(config)
+                    override_map.setdefault(config.override_id, []).append(config)
 
-                # Populate ID map with desired ID and path.
-                id_map[config.id] = config
+                # Populate ID map with path.
                 id_map[rel_file] = config
 
-        inherited = set()
-
-        def inherit(config):
-            if config in inherited:
-                return True
-
-            if config.inherit_id is not None:
-                parent = id_map.get(config.inherit_id)
-                if parent is None:
-                    _report_config_problem(
-                        "inheritance", config.file,
-                        "Config {0} inherits unknown config ID {1}.".format(config.file, config.inherit_id),
-                        "Presence config {0} inherits nonexistent config ID: {1}.".format(config.file, config.inherit_id)
-                    )
-                    return False
-
-                if not inherit(parent):
-                    return False
-                config.copy_from(parent)
-
-            inherited.add(config)
-            return True
-
         def remove(config):
-            del configs[config.file]
-            del id_map[config.file]
-            if config.id is not None:
-                del id_map[config.id]
+            # Configs may be removed more than once (e.g. losing override that
+            # also fails inheritance) and may share ID with another config, so
+            # only drop map entries that still point to this config.
+            configs.pop(config.file, None)
+            for key in (config.file, config.id):
+                if key is not None and id_map.get(key) is config:
+                    del id_map[key]
+
+        # Keep configs replaced by overrides reachable for overrides that also
+        # inherit from the config they replace.
+        replaced = dict()
 
         # Apply overrides.
         for _id, overrides in override_map.items():
@@ -500,23 +512,69 @@ init 90 python in _fom_presence_config:
             override = overrides[0]
             override.id = _id
             id_map[_id] = override
+            replaced[override] = target
 
-        # Apply inheritance.
-        while len(inherit_list) > 0:
-            config = inherit_list.pop()
-            if not inherit(config):
-                remove(config)
+        inherited = set()
+        failed = set()
 
-        # Re-populate config list with config list used locally.
-        del _configs[:]
-        _configs.extend(list(configs.items()))
+        def report_inheritance(config, ui_message, log_message):
+            failed.add(config)
+            _report_config_problem("inheritance", config.file, ui_message, log_message)
 
-        # Sort configs on reload to save precious time on every loop.
-        _configs.sort(key=lambda it: it[1].priority, reverse=True)
+        def inherit(config, chain):
+            if config in inherited:
+                return True
+            if config in failed:
+                return False
 
-        # Re-populate ID map.
-        _config_id_map.clear()
-        _config_id_map.update(id_map)
+            if config in chain:
+                cycle = chain[chain.index(config):] + [config]
+                cycle_str = " -> ".join(it.file for it in cycle)
+                for member in cycle[:-1]:
+                    report_inheritance(
+                        member,
+                        "Config {0} is part of inheritance cycle, see log/submod_log.log.".format(member.file),
+                        "Presence config {0} is part of inheritance cycle: {1}.".format(member.file, cycle_str)
+                    )
+                return False
+
+            if config.inherit_id is not None:
+                parent = id_map.get(config.inherit_id)
+                if parent is config and config in replaced:
+                    # Override inheriting from the config it replaces.
+                    parent = replaced[config]
+
+                if parent is None:
+                    report_inheritance(
+                        config,
+                        "Config {0} inherits unknown config ID {1}.".format(config.file, config.inherit_id),
+                        "Presence config {0} inherits nonexistent config ID: {1}.".format(config.file, config.inherit_id)
+                    )
+                    return False
+
+                if not inherit(parent, chain + [config]):
+                    if config not in failed:
+                        report_inheritance(
+                            config,
+                            "Config {0} inherits from config {1} that could not be loaded.".format(config.file, parent.file),
+                            "Presence config {0} inherits from config {1} that could not be loaded.".format(config.file, parent.file)
+                        )
+                    return False
+
+                config.copy_from(parent)
+
+            inherited.add(config)
+            return True
+
+        # Apply inheritance to remaining configs; parents (including removed
+        # ones) are resolved recursively.
+        for config in list(configs.values()):
+            inherit(config, [])
+
+        for config in failed:
+            remove(config)
+
+        return configs, id_map
 
     def get_active_config():
         """
