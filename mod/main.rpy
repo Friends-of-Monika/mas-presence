@@ -36,6 +36,10 @@ init 100 python in _fom_presence:
     # callback (which itself is invoked approximately 20 times a second.)
     _POLL_INTERVAL = 1
 
+    # Minimum interval between automatic connection attempts while not
+    # connected (on top of timeout lock.)
+    _RETRY_INTERVAL = 5
+
 
     # Keys of problems shown in settings pane (see status.rpy.)
     _STATUS_CONNECTION = "connection"
@@ -222,6 +226,7 @@ init 100 python in _fom_presence:
             self._connecting = False
             self._config = None
             self._lock_conn_until = None
+            self._last_attempt = None
             self._last_mean_update = None
             self._worker = None
             self._session = None
@@ -244,21 +249,37 @@ init 100 python in _fom_presence:
             return self._lock_conn_until is not None and self._lock_conn_until > datetime.datetime.now()
 
         @property
-        def timeout_lock_remaining(self):
+        def retry_in(self):
             """
-            Seconds until connection attempts are unlocked (rounded up), or
-            None if they are not locked.
+            Seconds (rounded up) until next automatic connection attempt, zero
+            if it is due, or None if connected or connecting.
             """
 
-            if not self.timeout_locked:
+            if self._connected or self._connecting:
                 return None
-            return int(math.ceil((self._lock_conn_until - datetime.datetime.now()).total_seconds()))
+
+            remaining = 0
+            if self._last_attempt is not None:
+                remaining = _RETRY_INTERVAL - (time.time() - self._last_attempt)
+            if self.timeout_locked:
+                remaining = max(remaining, (self._lock_conn_until - datetime.datetime.now()).total_seconds())
+            return max(0, int(math.ceil(remaining)))
+
+        def reconnect_if_due(self):
+            """
+            Starts a connection attempt if not connected and retry interval and
+            timeout lock have elapsed.
+            """
+
+            if self.retry_in == 0:
+                self.connect()
 
         @property
         def last_meaningful_update(self):
             return self._last_mean_update
 
         def connect(self):
+            self._last_attempt = time.time()
             if self._connecting:
                 self._logger.debug("Not connecting to Discord: connection attempt already in progress.")
                 return
@@ -430,6 +451,10 @@ init 100 python in _fom_presence:
 
     _last_periodic_poll = 0
 
+    # Set once ch30_preloop has run; configs (and store variables their
+    # conditions depend on) are not ready before that.
+    _started = False
+
     # Runs on the main thread approximately 20 times a second, but only polls
     # once per _POLL_INTERVAL seconds.
     def _on_periodic():
@@ -442,6 +467,8 @@ init 100 python in _fom_presence:
 
         try:
             presence.poll()
+            if _started and persistent._fom_presence_enabled:
+                presence.reconnect_if_due()
         except Exception:
             logging.DEFAULT.error("Failed to process Discord presence results:\n{0}".format(traceback.format_exc()))
 
@@ -454,6 +481,9 @@ init 100 python in _fom_presence:
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=100)
     def on_preloop():
+        global _started
+        _started = True
+
         logging.DEFAULT.debug("Starting up (presence enabled: {0}.)".format(persistent._fom_presence_enabled))
         if persistent._fom_presence_enabled:
             config.reload_configs()
@@ -468,8 +498,8 @@ init 100 python in _fom_presence:
         if persistent._fom_presence_enabled:
             if presence.connected:
                 presence.update()
-            elif not presence.timeout_locked:
-                presence.connect()
+            else:
+                presence.reconnect_if_due()
 
 
     # Runs when an event is called.

@@ -56,8 +56,8 @@ init 100:
                     color _fom_presence_settings.LEVEL_COLORS[_level]
                     substitute False
 
-        # Keep lock countdown in headline ticking.
-        if _fom_presence.presence.timeout_locked:
+        # Keep retry countdown in headline ticking.
+        if persistent._fom_presence_enabled and not _fom_presence.presence.connected:
             timer 1.0 repeat True action Function(renpy.restart_interaction)
 
 
@@ -107,10 +107,10 @@ init 100 python in _fom_presence_settings:
         if mod.presence.connecting:
             return "Status: connecting..."
 
-        remaining = mod.presence.timeout_lock_remaining
-        if remaining is not None:
+        remaining = mod.presence.retry_in
+        if remaining:
             return "Status: not connected, retrying in {0} seconds".format(remaining)
-        return "Status: not connected"
+        return "Status: not connected, retrying..."
 
     def escape_text(message):
         """
