@@ -17,7 +17,12 @@ init 100 python in _fom_presence:
     import time
     import math
 
-    _TIMEOUT_LOCK_DURATION = datetime.timedelta(seconds=45)
+    # Connection attempts are locked after timeouts and hangs with exponential
+    # backoff: lock duration starts at _BACKOFF_MIN seconds, doubles on each
+    # consecutive failure up to _BACKOFF_MAX seconds, and resets once a
+    # connection is established.
+    _BACKOFF_MIN = 5
+    _BACKOFF_MAX = 60
 
     # Time after which a Discord call still in progress is considered hung and
     # its worker is abandoned. Socket and pipe reads time out on their own well
@@ -194,7 +199,6 @@ init 100 python in _fom_presence:
                 )
                 return None
 
-            outcome.timeout_lock = False
             return rpc_socket
 
         def _timed_out(self, outcome):
@@ -226,6 +230,7 @@ init 100 python in _fom_presence:
             self._connecting = False
             self._config = None
             self._lock_conn_until = None
+            self._lock_failures = 0
             self._last_attempt = None
             self._last_mean_update = None
             self._worker = None
@@ -440,9 +445,12 @@ init 100 python in _fom_presence:
 
         def _set_timeout_lock(self, lock):
             if lock:
-                self._logger.debug("Locking connection attempts for {0}s.".format(int(_TIMEOUT_LOCK_DURATION.total_seconds())))
-                self._lock_conn_until = datetime.datetime.now() + _TIMEOUT_LOCK_DURATION
+                duration = min(_BACKOFF_MIN * 2 ** min(self._lock_failures, 16), _BACKOFF_MAX)
+                self._lock_failures += 1
+                self._logger.debug("Locking connection attempts for {0}s ({1} consecutive failures.)".format(duration, self._lock_failures))
+                self._lock_conn_until = datetime.datetime.now() + datetime.timedelta(seconds=duration)
             else:
+                self._lock_failures = 0
                 self._lock_conn_until = None
 
 
