@@ -1,3 +1,6 @@
+# This file is part of Discord Presence Submod (see link below):
+# https://github.com/friends-of-monika/mas-presence
+
 label friends_of_monika_discord_presence_submod_v0_0_1(version="v0_0_1"):
     return
 

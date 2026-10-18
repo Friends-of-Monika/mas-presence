@@ -1,15 +1,8 @@
-# main.rpy is the entrypoint into Discord Presence Submod, containing label
-# plugins (hooks) and presence controller, main logic governoring the Rich
-# Presence displayed on user's profile.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
-
+# https://github.com/friends-of-monika/mas-presence
 
 init 100 python in _fom_presence:
-
     import store
-
     from store import persistent
 
     from store import _fom_presence_config as config
@@ -21,7 +14,7 @@ init 100 python in _fom_presence:
     import socket
     import datetime
     import traceback
-
+    import time
 
     _TIMEOUT_LOCK_DURATION = datetime.timedelta(seconds=45)
 
@@ -37,6 +30,10 @@ init 100 python in _fom_presence:
 
     # Time to wait for the worker to disconnect cleanly on exit.
     _EXIT_TIMEOUT = 2
+
+    # Minimum interval between processing Discord results from Ren'Py periodic
+    # callback (which itself is invoked approximately 20 times a second.)
+    _POLL_INTERVAL = 1
 
 
     _ERROR_SOCKET_NOT_FOUND = error.Error(
@@ -112,8 +109,6 @@ init 100 python in _fom_presence:
             return outcome
 
         def update(self, app_id, activity):
-            # NOTE: There is no separate liveness check (Discord clients do not
-            # ping Discord), responses to activity commands serve as one.
             outcome = _Outcome()
             self._show(app_id, activity, outcome)
             return outcome
@@ -306,7 +301,7 @@ init 100 python in _fom_presence:
 
         def shutdown(self):
             """
-            Disconnects and stops the worker, waiting briefly for it to finish.
+            Disconnects and stops the worker, waiting for it to finish.
             """
 
             self._epoch += 1
@@ -389,6 +384,7 @@ init 100 python in _fom_presence:
             self._logger.warning("Discord worker stuck in a call for {0:.1f}s, abandoning it ({1} abandoned before.)".format(
                 elapsed, len(self._stuck_workers)
             ))
+
             self._worker.stop(cleanup=self._session.disconnect)
             self._stuck_workers.append(self._worker)
             self._worker = None
@@ -413,8 +409,18 @@ init 100 python in _fom_presence:
     presence = _PresenceController(logging.DEFAULT)
 
 
-    # Runs on the main thread approximately 20 times a second.
+    _last_periodic_poll = 0
+
+    # Runs on the main thread approximately 20 times a second, but only polls
+    # once per _POLL_INTERVAL seconds.
     def _on_periodic():
+        global _last_periodic_poll
+
+        now = time.time()
+        if now - _last_periodic_poll < _POLL_INTERVAL:
+            return
+        _last_periodic_poll = now
+
         try:
             presence.poll()
         except Exception:

@@ -1,8 +1,5 @@
-# settings.rpy contains settings panel rendered in submods menu under
-# Discord Presence Submod entry as well as functions invoked on button presses.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 init 100:
 

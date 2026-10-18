@@ -1,15 +1,9 @@
-# config.rpy contains classes and functions for working with presence config
-# files as well as stores persistent variables affecting the behavior of
-# Discord Presence Submod.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 default persistent._fom_presence_enabled = True
 
-
 init 90 python in _fom_presence_config:
-
     import store
 
     from store import persistent

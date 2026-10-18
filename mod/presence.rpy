@@ -1,8 +1,5 @@
-# presence.rpy contains Discord Rich Presence IPC/RPC protocol implementation
-# designed specifically for the needs of Discord Presence Submod.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 # In the development and debugging phase of this Discord RPC/IPC API the
 # follow resources were used (thanks ImKventis and Discord Developers):
@@ -13,9 +10,7 @@
 init -90 python in _fom_presence_discord:
 
     # Imports
-
     import store
-
     from store import _fom_presence_logging as logging
 
     import platform
@@ -27,7 +22,6 @@ init -90 python in _fom_presence_discord:
     import errno
     import socket
     import time
-
 
     # Constants
 

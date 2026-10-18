@@ -1,11 +1,7 @@
-# worker.rpy contains a minimal background task executor used to keep blocking
-# Discord IPC/RPC communication off the main game thread.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 init -90 python in _fom_presence_worker:
-
     # Imports
 
     import threading
@@ -15,8 +11,8 @@ init -90 python in _fom_presence_worker:
 
     class Task(object):
         """
-        Task is a unit of work executed by Worker on its thread. Once executed,
-        it holds either the returned result or the raised error.
+        Task is a unit of work executed by Worker on its thread.
+        Once executed, it holds either the returned result or the raised error.
         """
 
         def __init__(self, func, callback=None, key=None):
@@ -51,10 +47,6 @@ init -90 python in _fom_presence_worker:
         dedicated daemon thread. Results are not delivered by the worker thread
         itself; the main thread must call poll() to run task callbacks so that
         they can safely interact with Ren'Py.
-
-        NOTE:
-            Queue module is not available in MAS Python distribution, hence
-            the deque guarded with a condition variable.
         """
 
         def __init__(self, name, logger=None):
