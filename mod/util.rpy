@@ -1,25 +1,16 @@
-# util.rpy contains miscellaneous utility functions and classes that can be
-# reused in the rest of the Discord Presence Submod codebase.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
-
+# https://github.com/friends-of-monika/mas-presence
 
 init 10 python in _fom_presence_util:
-
     import store
-
     from store import mas_calendar
     from store import mas_getEV
 
-
 init -1000 python in _fom_presence_util:
-
     import os
     import datetime
     import io
     import sys
-
 
     def get_script_file(fallback=None, relative=False):
         """
@@ -113,7 +104,6 @@ init -1000 python in _fom_presence_util:
                 # Simply remove leading "game" item frm path parts.
                 parts.pop(0)
             return "/".join(parts)
-
 
     class Supplier(object):
         """

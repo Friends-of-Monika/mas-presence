@@ -1,10 +1,7 @@
-# header.rpy contains MAS submod header as well as Submod Updater header.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 init -990 python in mas_submod_utils:
-
     Submod(
         author="Friends of Monika",
         name="Discord Presence Submod",
@@ -24,9 +21,7 @@ init -990 python in mas_submod_utils:
         }
     )
 
-
 init -989 python:
-
     if store.mas_submod_utils.isSubmodInstalled("Submod Updater Plugin"):
         store.sup_utils.SubmodUpdater(
             submod="Discord Presence Submod",
@@ -35,16 +30,14 @@ init -989 python:
             extraction_depth=3
         )
 
-
 init -100 python in _fom_presence:
-
     import store
-
     from store import _fom_presence_util as util
-
     import os
 
-
-    basedir = os.path.join(renpy.config.basedir, *util.get_script_file(
-        fallback="game/Submods/Discord Presence Submod/config.rpy"
-    ).split("/")[:-1])
+    basedir = os.path.join(
+        renpy.config.basedir,
+        *util.get_script_file(
+            fallback="game/Submods/Discord Presence Submod/config.rpy"
+        ).split("/")[:-1]
+    )
