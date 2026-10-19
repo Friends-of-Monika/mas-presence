@@ -290,14 +290,18 @@ init 90 python in _fom_presence_config:
                     ParserWrapper that will load values from ConfigParser.
             """
 
+            # Condition is compiled once here (which also catches syntax
+            # errors early), and only the code object is evaluated afterwards.
             condition = parser.get_value("Presence", "Condition")
+            condition_code = None
             if condition is not None:
                 condition = condition.strip()
                 if len(condition) > 0:
-                    compile(condition, "<string>", "eval")
+                    condition_code = compile(condition, "<string>", "eval")
                 else:
                     condition = None
             self.condition = condition
+            self.condition_code = condition_code
 
             self.priority = parser.get_value("Presence", "Priority", int, 0)
             self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
@@ -564,8 +568,8 @@ init 90 python in _fom_presence_config:
 
                 try:
                     config = Config.from_file(_file)
-                    if config.condition is not None:
-                        eval(config.condition, dict(), store.__dict__)
+                    if config.condition_code is not None:
+                        eval(config.condition_code, dict(), store.__dict__)
                     config._file = rel_file
                 except Exception as e:
                     _report_config_problem(
@@ -723,9 +727,9 @@ init 90 python in _fom_presence_config:
         """
 
         for rel_file, conf in _configs:
-            if not conf.disable and conf.condition is not None:
+            if not conf.disable and conf.condition_code is not None:
                 try:
-                    result = bool(eval(conf.condition, dict(), store.__dict__))
+                    result = bool(eval(conf.condition_code, dict(), store.__dict__))
                 except Exception as e:
                     _report_config_problem(
                         "condition", rel_file,
