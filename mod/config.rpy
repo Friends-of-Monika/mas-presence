@@ -383,6 +383,7 @@ init 90 python in _fom_presence_config:
     _config_dir = os.path.join(mod.basedir, "config")
     _configs = list()
     _config_id_map = dict()
+    _config_path_map = dict()
 
     def reload_configs():
         """
@@ -397,7 +398,7 @@ init 90 python in _fom_presence_config:
         status.clear_prefix(_STATUS_CONFIG_PREFIX)
 
         try:
-            configs, id_map = _load_configs()
+            configs, ids, paths = _load_configs()
         except Exception:
             logging.DEFAULT.error("Could not reload presence configs:\n{0}".format(traceback.format_exc()))
             status.set(
@@ -406,16 +407,75 @@ init 90 python in _fom_presence_config:
             )
             return
 
-        # Re-populate config list with config list used locally.
+        # Re-populate config list, sorted on reload to save precious time on
+        # every loop (and by path too, so that ties are resolved the same way
+        # every time.)
         del _configs[:]
-        _configs.extend(list(configs.items()))
+        _configs.extend(sorted(configs.items(), key=lambda it: _load_order(it[1])))
 
-        # Sort configs on reload to save precious time on every loop.
-        _configs.sort(key=lambda it: it[1].priority, reverse=True)
-
-        # Re-populate ID map.
+        # Re-populate ID and path maps.
         _config_id_map.clear()
-        _config_id_map.update(id_map)
+        _config_id_map.update(ids)
+        _config_path_map.clear()
+        _config_path_map.update(paths)
+
+    def _normalize_ref(ref):
+        """
+        Normalizes config reference (ID or path relative to config directory)
+        so that paths always use "/" as folder separator.
+
+        IN:
+            ref -> str:
+                Reference to normalize.
+
+        OUT:
+            str:
+                Normalized reference.
+        """
+
+        ref = ref.strip().replace("\\", "/")
+        while ref.startswith("./"):
+            ref = ref[2:]
+        return ref.lstrip("/")
+
+    def _lookup(ref, ids, paths):
+        """
+        Looks up config by reference, trying it as an ID first and as a path
+        (relative to config directory) second.
+
+        IN:
+            ref -> str or None:
+                Config ID or path.
+
+            ids -> dict:
+                Map of config ID to Config instance.
+
+            paths -> dict:
+                Map of config path to Config instance.
+
+        OUT:
+            Config:
+                If config was found.
+
+            None:
+                If no config matches reference.
+        """
+
+        if ref is None:
+            return None
+        ref = _normalize_ref(ref)
+        config = ids.get(ref)
+        if config is None:
+            config = paths.get(ref)
+        return config
+
+    def _load_order(config):
+        """
+        Sort key that orders configs by priority (highest first) and then by
+        path, so that order is the same on every load and every platform.
+        """
+
+        return (-config.priority, config.file)
 
     def _load_configs():
         """
@@ -423,18 +483,19 @@ init 90 python in _fom_presence_config:
         inheritance.
 
         OUT:
-            tuple of (configs, id_map):
+            tuple of (configs, ids, paths):
                 configs -> dict:
-                    Map of config path (relative to config directory) to
-                    Config instance.
+                    Map of config path (relative to config directory, with
+                    "/" separators) to Config instance.
 
-                id_map -> dict:
-                    Map of config ID and config path to Config instance.
+                ids -> dict:
+                    Map of config ID to Config instance.
+
+                paths -> dict:
+                    Map of config path to Config instance.
         """
 
         configs = dict()
-        id_map = dict()
-        override_map = dict()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
@@ -446,7 +507,7 @@ init 90 python in _fom_presence_config:
                     continue
 
                 _file = os.path.join(_dir, _file)
-                rel_file = _file[len(_config_dir) + 1:]
+                rel_file = os.path.relpath(_file, _config_dir).replace(os.sep, "/")
 
                 try:
                     config = Config.from_file(_file)
@@ -461,57 +522,75 @@ init 90 python in _fom_presence_config:
                     )
                     continue
 
-                # Save config to config map by its path as map key.
                 configs[rel_file] = config
-                if config.id is not None:
-                    if config.id in id_map:
-                        _report_config_problem(
-                            "clash", rel_file,
-                            "Config {0} has conflicting ID {1}.".format(rel_file, config.id),
-                            "Config from file {0} has conflicting ID with some other config: {1}.".format(rel_file, config.id),
-                            status.WARNING
-                        )
-                    id_map[config.id] = config
 
-                # Build override map (ID of config to override to list of configs
-                # willing to override.)
-                if config.override_id is not None:
-                    override_map.setdefault(config.override_id, []).append(config)
+        # Build path and ID maps. When several configs share an ID, the one
+        # with the highest priority (then the first by path) gets it.
+        paths = dict(configs)
+        ids = dict()
+        for config in sorted(configs.values(), key=_load_order):
+            if config.id is None:
+                continue
 
-                # Populate ID map with path.
-                id_map[rel_file] = config
+            owner = ids.get(config.id)
+            if owner is None:
+                ids[config.id] = config
+                continue
+
+            _report_config_problem(
+                "clash", config.file,
+                "Config {0} has ID {1} already used by config {2}.".format(config.file, config.id, owner.file),
+                "Presence config {0} has ID {1} already used by config {2} (which takes precedence.)".format(config.file, config.id, owner.file),
+                status.WARNING
+            )
 
         def remove(config):
             # Configs may be removed more than once (e.g. losing override that
             # also fails inheritance) and may share ID with another config, so
             # only drop map entries that still point to this config.
             configs.pop(config.file, None)
-            for key in (config.file, config.id):
-                if key is not None and id_map.get(key) is config:
-                    del id_map[key]
+            if paths.get(config.file) is config:
+                del paths[config.file]
+            if config.id is not None and ids.get(config.id) is config:
+                del ids[config.id]
+
+        # Build override map (config to override to list of configs willing to
+        # override it); references are resolved first so that the same config
+        # referenced by ID and by path is treated as one.
+        override_map = dict()
+        for config in sorted(configs.values(), key=_load_order):
+            if config.override_id is None:
+                continue
+
+            target = _lookup(config.override_id, ids, paths)
+            if target is None or target is config:
+                _report_config_problem(
+                    "override", config.file,
+                    "Config {0} overrides unknown config ID {1}.".format(config.file, config.override_id),
+                    "Presence config {0} overrides nonexistent config ID: {1}.".format(config.file, config.override_id)
+                )
+                continue
+
+            override_map.setdefault(target, []).append(config)
 
         # Keep configs replaced by overrides reachable for overrides that also
         # inherit from the config they replace.
         replaced = dict()
 
-        # Apply overrides.
-        for _id, overrides in override_map.items():
-            target = id_map.get(_id)
-            if target is None:
-                _report_config_problem(
-                    "override", overrides[0].file,
-                    "Config {0} overrides unknown config ID {1}.".format(overrides[0].file, _id),
-                    "Presence config {0} overrides nonexistent config ID: {1}.".format(overrides[0].file, _id)
-                )
-                continue
-
-            overrides.sort(key=lambda it: it.priority, reverse=True)
+        # Apply overrides. Overrides are already sorted by priority, so the
+        # first one wins.
+        for target in sorted(override_map, key=lambda it: it.file):
+            overrides = override_map[target]
             for rem_conf in (overrides[1:] + [target]):
                 remove(rem_conf)
 
+            # Override takes place of the replaced config under both its ID
+            # and path, so that both keep referring to it.
             override = overrides[0]
-            override.id = _id
-            id_map[_id] = override
+            if target.id is not None:
+                override.id = target.id
+                ids[target.id] = override
+            paths[target.file] = override
             replaced[override] = target
 
         inherited = set()
@@ -539,7 +618,7 @@ init 90 python in _fom_presence_config:
                 return False
 
             if config.inherit_id is not None:
-                parent = id_map.get(config.inherit_id)
+                parent = _lookup(config.inherit_id, ids, paths)
                 if parent is config and config in replaced:
                     # Override inheriting from the config it replaces.
                     parent = replaced[config]
@@ -568,13 +647,13 @@ init 90 python in _fom_presence_config:
 
         # Apply inheritance to remaining configs; parents (including removed
         # ones) are resolved recursively.
-        for config in list(configs.values()):
+        for config in sorted(configs.values(), key=_load_order):
             inherit(config, [])
 
         for config in failed:
             remove(config)
 
-        return configs, id_map
+        return configs, ids, paths
 
     def get_active_config():
         """
@@ -607,18 +686,20 @@ init 90 python in _fom_presence_config:
 
     def get_config(_id):
         """
-        Fetches config by its ID (defined as ID= parameter in Presence section).
+        Fetches config by its ID (defined as ID= parameter in Presence section)
+        or by its path relative to config directory.
 
         IN:
             _id -> str:
-                ID of the config to fetch reference to.
+                ID or path of the config to fetch reference to.
 
         OUT:
             Config:
-                If config with such ID exists and was successfully loaded.
+                If config with such ID or path exists and was successfully
+                loaded.
 
             None:
-                If config with such ID does not exist.
+                If config with such ID or path does not exist.
         """
 
-        return _config_id_map.get(_id)
+        return _lookup(_id, _config_id_map, _config_path_map)
