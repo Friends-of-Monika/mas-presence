@@ -361,8 +361,10 @@ init 100 python in _fom_presence:
             if with_config is None:
                 with_config = config.get_active_config()
 
+            # Configs are compared by file, since reloading configs creates new
+            # Config instances even for configs that did not change.
             prev_config, self._config = self._config, with_config
-            if self._config is not None and (prev_config is None or prev_config != self._config):
+            if self._config is not None and (prev_config is None or prev_config.file != self._config.file):
                 self._last_mean_update = datetime.datetime.now()
 
             self._submit("update", self._config, key="update", force=force)
