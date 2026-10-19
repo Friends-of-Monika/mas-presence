@@ -293,7 +293,7 @@ init 90 python in _fom_presence_config:
 
             c = configparser.ConfigParser()
             with _open_with_encoding(path, "r", encoding="utf-8") as f:
-                c.readfp(f, path.replace("\\", "/").split("/")[:-1])
+                c.readfp(f, path.replace("\\", "/"))
 
             config = Config(_ParserWrapper(c))
             config._file = path
