@@ -3,7 +3,7 @@
 
 # In the development and debugging phase of this Discord RPC/IPC API the
 # follow resources were used (thanks ImKventis and Discord Developers):
-# - https://github.com/ImKventis/MAS_RPC/blob/ab5209114d6165ad1c94a6d1aa75ccd695e3d1ef/game/Submods/Kventis_RPC/kventis_rpc.rpy
+# - https://archive.ph/8iw8J (ImKventis/DRPC_MAS)
 # - https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md
 # - https://discord.com/developers/docs/rich-presence/how-to
 

@@ -493,9 +493,10 @@ init 100 python in _fom_presence:
         _started = True
 
         logging.DEFAULT.debug("Starting up (presence enabled: {0}.)".format(persistent._fom_presence_enabled))
+        # Load configs even if presence is disabled, so that they are ready
+        # once it gets enabled in settings.
+        config.reload_configs()
         if persistent._fom_presence_enabled:
-            config.reload_configs()
-        if not presence.timeout_locked:
             presence.connect()
 
 
