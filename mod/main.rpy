@@ -534,9 +534,9 @@ init 100 python in _fom_presence:
 
     _last_periodic_poll = 0
 
-    # Set once ch30_preloop has run; configs (and store variables their
-    # conditions depend on) are not ready before that.
-    _started = False
+    # Set once configs are loaded on first ch30_loop; configs (and store
+    # variables their conditions depend on) are not ready before that.
+    _ready = False
 
     # Runs on the main thread approximately 20 times a second, but only polls
     # once per _POLL_INTERVAL seconds.
@@ -550,7 +550,7 @@ init 100 python in _fom_presence:
 
         try:
             presence.poll()
-            if _started and persistent._fom_presence_enabled:
+            if _ready and persistent._fom_presence_enabled:
                 presence.reconnect_if_due()
         except Exception:
             logging.DEFAULT.error("Failed to process Discord presence results:\n{0}".format(traceback.format_exc()))
@@ -564,20 +564,30 @@ init 100 python in _fom_presence:
     # Runs once on startup, but post-init.
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=100)
     def on_preloop():
-        global _started
-        _started = True
-
         logging.DEFAULT.debug("Starting up (presence enabled: {0}.)".format(persistent._fom_presence_enabled))
-        # Load configs even if presence is disabled, so that they are ready
-        # once it gets enabled in settings.
+
+
+    def _load_on_first_loop():
+        """
+        Loads configs once MAS (and other submods) finished starting up, so
+        that conditions evaluated on load see all store variables they need.
+        Configs are loaded even if presence is disabled, so that they are ready
+        once it gets enabled in settings.
+        """
+
+        global _ready
+        if _ready:
+            return
+        _ready = True
+
+        logging.DEFAULT.debug("Loading presence configs on first loop.")
         config.reload_configs()
-        if persistent._fom_presence_enabled:
-            presence.connect()
 
 
     # Runs approximately once per 5 seconds while not in dialogue.
     @store.mas_submod_utils.functionplugin("ch30_loop", priority=100)
     def on_loop():
+        _load_on_first_loop()
         presence.poll()
         if persistent._fom_presence_enabled:
             if presence.connected:
@@ -589,7 +599,9 @@ init 100 python in _fom_presence:
     # Runs when an event is called.
     @store.mas_submod_utils.functionplugin("call_next_event", priority=100)
     def on_event():
-        on_loop()
+        # Events before first loop (if any) are not presence-worthy yet.
+        if _ready:
+            on_loop()
 
 
     # Runs on exit.
