@@ -16,6 +16,7 @@ init 100 python in _fom_presence:
     import traceback
     import time
     import math
+    import json
 
     # Connection attempts are locked after timeouts and hangs with exponential
     # backoff: lock duration starts at _BACKOFF_MIN seconds, doubles on each
@@ -45,10 +46,36 @@ init 100 python in _fom_presence:
     # connected (on top of timeout lock.)
     _RETRY_INTERVAL = 5
 
+    # Unchanged activity is not resent to Discord, except once it has been
+    # set for this many seconds: since nothing else is sent while connected,
+    # this also detects connections lost (e.g. when Discord was restarted.)
+    _REFRESH_INTERVAL = 60
+
 
     # Keys of problems shown in settings pane (see status.rpy.)
     _STATUS_CONNECTION = "connection"
     _STATUS_ACTIVITY = "activity"
+
+
+    def _hash_activity(app_id, activity):
+        """
+        Computes hash of activity as it would be sent to Discord, so that
+        unchanged activities can be detected without keeping their copies.
+
+        IN:
+            app_id -> int or None:
+                Application ID the activity is set for.
+
+            activity -> discord.Activity or None:
+                Activity to hash.
+
+        OUT:
+            int:
+                Hash of application ID and activity.
+        """
+
+        data = activity.to_dict() if activity is not None else None
+        return hash((app_id, json.dumps(data, sort_keys=True)))
 
 
     class _Outcome(object):
@@ -61,6 +88,7 @@ init 100 python in _fom_presence:
             self.status = []
             self.connected = None
             self.timeout_lock = None
+            self.activity_set = False
 
         def set_status(self, key, ui_message, log_message=None, level=status.ERROR):
             self.status.append((status.set, (key, ui_message, log_message, level)))
@@ -133,6 +161,7 @@ init 100 python in _fom_presence:
             try:
                 client.set_activity(activity)
                 self._active_app_id = app_id
+                outcome.activity_set = True
                 outcome.clear_status(_STATUS_ACTIVITY)
                 outcome.connection_established()
             except discord.ProtocolError as e:
@@ -232,6 +261,12 @@ init 100 python in _fom_presence:
             self._lock_conn_until = None
             self._lock_failures = 0
             self._last_attempt = None
+
+            # Hashes of activity last set in Discord and of activity submitted
+            # but not yet set, used to skip updates that would change nothing.
+            self._sent_hash = None
+            self._sent_at = None
+            self._pending_hash = None
             self._last_mean_update = None
             self._worker = None
             self._session = None
@@ -304,6 +339,9 @@ init 100 python in _fom_presence:
         def disconnect(self):
             self._logger.debug("Disconnecting from Discord.")
             self._epoch += 1
+            self._sent_hash = None
+            self._sent_at = None
+            self._pending_hash = None
             self._connected = False
             self._connecting = False
 
@@ -313,7 +351,13 @@ init 100 python in _fom_presence:
             if self._worker is not None:
                 self._worker.submit(self._session.disconnect)
 
-        def update(self, with_config=None):
+        def update(self, with_config=None, force=False):
+            """
+            Updates activity from the provided (or currently active) config.
+            Unless forced, nothing is sent if the activity is the same as the
+            one already set (or about to be set) in Discord.
+            """
+
             if with_config is None:
                 with_config = config.get_active_config()
 
@@ -321,7 +365,7 @@ init 100 python in _fom_presence:
             if self._config is not None and (prev_config is None or prev_config != self._config):
                 self._last_mean_update = datetime.datetime.now()
 
-            self._submit("update", self._config, key="update")
+            self._submit("update", self._config, key="update", force=force)
 
         def poll(self):
             """
@@ -344,6 +388,9 @@ init 100 python in _fom_presence:
             """
 
             self._epoch += 1
+            self._sent_hash = None
+            self._sent_at = None
+            self._pending_hash = None
             self._connected = False
             self._connecting = False
 
@@ -355,13 +402,23 @@ init 100 python in _fom_presence:
                 self._worker = None
                 self._session = None
 
-        def _submit(self, op, with_config, key=None):
-            if not self._ensure_worker():
-                return False
-
+        def _submit(self, op, with_config, key=None, force=False):
             app_id, activity = None, None
             if with_config is not None:
                 app_id, activity = with_config.app_id, with_config.to_activity()
+
+            activity_hash = _hash_activity(app_id, activity)
+            fresh = self._sent_at is not None and time.time() - self._sent_at < _REFRESH_INTERVAL
+            if op == "update" and not force and (
+                activity_hash == self._pending_hash
+                or (activity_hash == self._sent_hash and fresh)
+            ):
+                if logging.TRACE:
+                    self._logger.debug("Not submitting {0}: activity unchanged (app ID {1}.)".format(op, app_id))
+                return False
+
+            if not self._ensure_worker():
+                return False
 
             func = getattr(self._session, op)
             epoch = self._epoch
@@ -369,17 +426,32 @@ init 100 python in _fom_presence:
             if logging.TRACE:
                 self._logger.debug("Submitting {0} (app ID {1}.)".format(op, app_id))
 
-            return self._worker.submit(
+            submitted = self._worker.submit(
                 lambda: func(app_id, activity),
-                lambda task: self._on_done(task, op, epoch),
+                lambda task: self._on_done(task, op, epoch, activity_hash),
                 key=key
             )
+            if submitted:
+                self._pending_hash = activity_hash
+            return submitted
 
-        def _on_done(self, task, op, epoch):
+        def _on_done(self, task, op, epoch, activity_hash):
             current = epoch == self._epoch
             if current and op == "connect":
                 self._connecting = False
                 renpy.restart_interaction()
+
+            if current:
+                if self._pending_hash == activity_hash:
+                    self._pending_hash = None
+
+                # Remember what Discord shows now; on failure forget it, so
+                # that the next update is sent regardless.
+                outcome = task.result if task.error is None else None
+                if outcome is not None and outcome.activity_set:
+                    self._sent_hash, self._sent_at = activity_hash, time.time()
+                else:
+                    self._sent_hash, self._sent_at = None, None
 
             if task.error is not None:
                 self._logger.error("Unexpected error while communicating with Discord ({0}):\n{1}".format(op, task.traceback))
@@ -432,6 +504,9 @@ init 100 python in _fom_presence:
             self._session = None
 
             self._epoch += 1
+            self._sent_hash = None
+            self._sent_at = None
+            self._pending_hash = None
             self._connected = False
             self._connecting = False
 
