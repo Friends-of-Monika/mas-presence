@@ -119,6 +119,24 @@ from A and have values both from A and from B.
 Only omitted values are replaced, in case some value is present in the child
 config it will never be replaced.
 
+To remove an inherited value instead, set it explicitly empty (or to `None` for
+timestamps). For example, this child config shows no details line, no small
+image and no start timestamp, even if its parent has them:
+
+```ini
+[Presence]
+Inherit = Default
+
+[Activity]
+Details =
+
+[Assets]
+SmallImage =
+
+[Timestamps]
+Start = None
+```
+
 ### Overriding
 
 Continuing to counter issues with default config customization, in patch 0.3.1

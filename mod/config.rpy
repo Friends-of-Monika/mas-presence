@@ -119,6 +119,51 @@ init 90 python in _fom_presence_config:
 
     # ConfigParser wrapper and related functions and classes
 
+    # Marker for values omitted in config file, as opposed to values set
+    # explicitly empty (or to None for timestamps), so that only omitted values
+    # are inherited. Replaced with defaults once inheritance is applied.
+    _UNSET = object()
+
+    def _parse_text(s):
+        """
+        Parses activity text: empty value means no text, anything else is a
+        string to perform substitution on whenever activity is built.
+
+        IN:
+            s -> str:
+                Text to parse.
+
+        OUT:
+            Supplier:
+                Supplier of substituted text, or util.SUPPLY_NONE for empty
+                value.
+        """
+
+        if not s.strip():
+            return util.SUPPLY_NONE
+        return util.supply_subsitute(s)
+
+    def _parse_image(s):
+        """
+        Parses image asset key or URL: empty value means no image.
+
+        IN:
+            s -> str:
+                Image key or URL to parse.
+
+        OUT:
+            str:
+                Image key or URL.
+
+            None:
+                For empty value.
+        """
+
+        s = s.strip()
+        if not s:
+            return None
+        return s
+
     def _parse_bool(s):
         """
         Parses a string and returns a boolean value for its content.
@@ -261,18 +306,19 @@ init 90 python in _fom_presence_config:
             self.override_id = parser.get_value("Presence", "Override", str, None)
             self.disable = parser.get_value("Presence", "Disable", _parse_bool, False)
 
-            self.app_id = parser.get_value("Client", "ApplicationID", int)
+            # Inheritable values are _UNSET if omitted, see finalize().
+            self.app_id = parser.get_value("Client", "ApplicationID", int, _UNSET)
 
-            self.details = parser.get_value("Activity", "Details", util.supply_subsitute, util.SUPPLY_NONE)
-            self.state = parser.get_value("Activity", "State", util.supply_subsitute, util.SUPPLY_NONE)
+            self.details = parser.get_value("Activity", "Details", _parse_text, _UNSET)
+            self.state = parser.get_value("Activity", "State", _parse_text, _UNSET)
 
-            self.large_image = parser.get_value("Assets", "LargeImage")
-            self.large_text = parser.get_value("Assets", "LargeText", util.supply_subsitute, util.SUPPLY_NONE)
-            self.small_image = parser.get_value("Assets", "SmallImage")
-            self.small_text = parser.get_value("Assets", "SmallText", util.supply_subsitute, util.SUPPLY_NONE)
+            self.large_image = parser.get_value("Assets", "LargeImage", _parse_image, _UNSET)
+            self.large_text = parser.get_value("Assets", "LargeText", _parse_text, _UNSET)
+            self.small_image = parser.get_value("Assets", "SmallImage", _parse_image, _UNSET)
+            self.small_text = parser.get_value("Assets", "SmallText", _parse_text, _UNSET)
 
-            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, util.SUPPLY_NONE)
-            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, util.SUPPLY_NONE)
+            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, _UNSET)
+            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, _UNSET)
 
             self._activity = None
             self._file = None
@@ -311,34 +357,41 @@ init 90 python in _fom_presence_config:
 
             return self._file
 
+        # Values copied from parent config if omitted, with their defaults.
+        _INHERITABLE = (
+            ("app_id", None),
+            ("details", util.SUPPLY_NONE),
+            ("state", util.SUPPLY_NONE),
+            ("large_image", None),
+            ("large_text", util.SUPPLY_NONE),
+            ("small_image", None),
+            ("small_text", util.SUPPLY_NONE),
+            ("start_ts", util.SUPPLY_NONE),
+            ("stop_ts", util.SUPPLY_NONE)
+        )
+
         def copy_from(self, config):
             """
-            Copies values from another config (only omitted, None or
-            util.SUPPLY_NONE values) over to this config.
+            Copies values omitted in this config from another config. Values
+            set explicitly (including empty ones) are kept.
 
             IN:
                 config -> Config:
                     Config to copy values from.
             """
 
-            if self.app_id is None:
-                self.app_id = config.app_id
-            if self.details is util.SUPPLY_NONE:
-                self.details = config.details
-            if self.state is util.SUPPLY_NONE:
-                self.state = config.state
-            if self.large_image is None:
-                self.large_image = config.large_image
-            if self.large_text is util.SUPPLY_NONE:
-                self.large_text = config.large_text
-            if self.small_image is None:
-                self.small_image = config.small_image
-            if self.small_text is util.SUPPLY_NONE:
-                self.small_text = config.small_text
-            if self.start_ts is util.SUPPLY_NONE:
-                self.start_ts = config.start_ts
-            if self.stop_ts is util.SUPPLY_NONE:
-                self.stop_ts = config.stop_ts
+            for name, _ in Config._INHERITABLE:
+                if getattr(self, name) is _UNSET:
+                    setattr(self, name, getattr(config, name))
+
+        def finalize(self):
+            """
+            Replaces values still omitted after inheritance with defaults.
+            """
+
+            for name, default in Config._INHERITABLE:
+                if getattr(self, name) is _UNSET:
+                    setattr(self, name, default)
 
         def to_activity(self):
             """
@@ -652,6 +705,9 @@ init 90 python in _fom_presence_config:
 
         for config in failed:
             remove(config)
+
+        for config in configs.values():
+            config.finalize()
 
         return configs, ids, paths
 
