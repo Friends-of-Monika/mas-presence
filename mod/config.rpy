@@ -25,6 +25,32 @@ init 90 python in _fom_presence_config:
         import configparser
 
 
+    def _to_text(value):
+        """
+        Converts value (e.g. exception or byte string path) to text for log
+        messages without failing on non-ASCII characters.
+
+        IN:
+            value -> any:
+                Value to convert.
+
+        OUT:
+            unicode:
+                Text representation of value.
+        """
+
+        if sys.version_info.major != 2:
+            return str(value)
+        if isinstance(value, unicode):
+            return value
+        if isinstance(value, str):
+            return value.decode("utf-8", "replace")
+        try:
+            return unicode(value)
+        except UnicodeError:
+            return str(value).decode("utf-8", "replace")
+
+
     # Problems shown in settings pane (see status.rpy)
 
     _STATUS_CONFIG_PREFIX = "config:"
@@ -167,24 +193,59 @@ init 90 python in _fom_presence_config:
     def _parse_bool(s):
         """
         Parses a string and returns a boolean value for its content.
-        Values "true", "yes", "y" (case-insensitive) will be considered True,
-        anything else will be False.
+        Values "true", "yes", "y", "1" (case-insensitive) are considered True,
+        values "false", "no", "n", "0" are considered False.
 
         IN:
             s -> str:
                 String to parse boolean from.
 
         OUT:
-            True:
-                For strings "true", "yes", "y" (case-insensitive.)
+            bool:
+                Parsed value.
 
-            False:
-                For any other strings.
+        RAISES:
+            ValueError:
+                If value is neither of the above.
         """
 
-        if s.lower() in ("true", "yes", "y"):
+        s = s.strip().lower()
+        if s in ("true", "yes", "y", "1"):
             return True
-        return False
+        if s in ("false", "no", "n", "0"):
+            return False
+        raise ValueError("expected True or False")
+
+    def _parse_int(s):
+        """
+        Parses an integer value (e.g. priority or application ID.)
+
+        RAISES:
+            ValueError:
+                If value is not a whole number.
+        """
+
+        try:
+            return int(s.strip())
+        except (ValueError, UnicodeError):
+            raise ValueError("expected a whole number")
+
+    def _parse_str(s):
+        """
+        Parses a plain string value (e.g. config ID), stripping whitespace.
+        Unlike str(), keeps non-ASCII characters intact.
+        """
+
+        return s.strip()
+
+    # Known sections and keys (lowercase, as ConfigParser lowercases keys.)
+    _SCHEMA = {
+        "Presence": ("condition", "priority", "dynamic", "id", "inherit", "override", "disable"),
+        "Client": ("applicationid",),
+        "Activity": ("details", "state"),
+        "Assets": ("largeimage", "largetext", "smallimage", "smalltext"),
+        "Timestamps": ("start", "end")
+    }
 
     if sys.version_info.major == 2:
         def _open_with_encoding(path, mode, encoding="utf-8"):
@@ -267,9 +328,42 @@ init 90 python in _fom_presence_config:
             """
 
             try:
-                return deserializer(self._parser.get(section, value, raw=True))
-            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                raw = self._parser.get(section, value, raw=True)
+            except (configparser.NoOptionError, configparser.NoSectionError):
                 return default
+
+            try:
+                return deserializer(raw)
+            except Exception as e:
+                raise ValueError(u"invalid value of {0} in [{1}]: \"{2}\" ({3})".format(value, section, raw.strip(), e))
+
+        def find_unknown(self):
+            """
+            Finds sections and keys not used by configs (e.g. misspelt ones.)
+
+            OUT:
+                list of str:
+                    Descriptions of unknown sections and keys.
+            """
+
+            problems = []
+            lower_sections = dict((name.lower(), name) for name in _SCHEMA)
+            defaults = set(self._parser.defaults())
+
+            for section in self._parser.sections():
+                if section not in _SCHEMA:
+                    known = lower_sections.get(section.lower())
+                    if known is not None:
+                        problems.append(u"section [{0}] is ignored, did you mean [{1}]? (section names are case-sensitive)".format(section, known))
+                    else:
+                        problems.append(u"unknown section [{0}] is ignored".format(section))
+                    continue
+
+                for key in self._parser.options(section):
+                    if key not in defaults and key not in _SCHEMA[section]:
+                        problems.append(u"unknown key {0} in [{1}] is ignored".format(key, section))
+
+            return problems
 
 
     # Config object and related functions and variables
@@ -297,21 +391,24 @@ init 90 python in _fom_presence_config:
             if condition is not None:
                 condition = condition.strip()
                 if len(condition) > 0:
-                    condition_code = compile(condition, "<string>", "eval")
+                    try:
+                        condition_code = compile(condition, "<string>", "eval")
+                    except SyntaxError as e:
+                        raise ValueError(u"invalid Condition in [Presence]: {0}".format(e))
                 else:
                     condition = None
             self.condition = condition
             self.condition_code = condition_code
 
-            self.priority = parser.get_value("Presence", "Priority", int, 0)
+            self.priority = parser.get_value("Presence", "Priority", _parse_int, 0)
             self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
-            self.id = parser.get_value("Presence", "ID", str, None)
-            self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
-            self.override_id = parser.get_value("Presence", "Override", str, None)
+            self.id = parser.get_value("Presence", "ID", _parse_str, None)
+            self.inherit_id = parser.get_value("Presence", "Inherit", _parse_str, None)
+            self.override_id = parser.get_value("Presence", "Override", _parse_str, None)
             self.disable = parser.get_value("Presence", "Disable", _parse_bool, False)
 
             # Inheritable values are _UNSET if omitted, see finalize().
-            self.app_id = parser.get_value("Client", "ApplicationID", int, _UNSET)
+            self.app_id = parser.get_value("Client", "ApplicationID", _parse_int, _UNSET)
 
             self.details = parser.get_value("Activity", "Details", _parse_text, _UNSET)
             self.state = parser.get_value("Activity", "State", _parse_text, _UNSET)
@@ -321,11 +418,33 @@ init 90 python in _fom_presence_config:
             self.small_image = parser.get_value("Assets", "SmallImage", _parse_image, _UNSET)
             self.small_text = parser.get_value("Assets", "SmallText", _parse_text, _UNSET)
 
-            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, _UNSET)
-            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, _UNSET)
+            # Problems that do not prevent this config from being used, but
+            # likely indicate a mistake (e.g. misspelt keys.)
+            self.warnings = parser.find_unknown()
+
+            self.start_ts = self._get_timestamp(parser, "Start")
+            self.stop_ts = self._get_timestamp(parser, "End")
 
             self._activity = None
             self._file = None
+
+        def _get_timestamp(self, parser, key):
+            """
+            Reads timestamp supplier, adding a warning for unknown supplier
+            names (in which case no timestamp is shown.)
+            """
+
+            name = parser.get_value("Timestamps", key, _parse_str, _UNSET)
+            if name is _UNSET:
+                return _UNSET
+
+            supplier = _parse_ts_supplier(name)
+            if supplier is None:
+                self.warnings.append(u"unknown timestamp {0} = {1} is ignored (known: {2})".format(
+                    key, name, ", ".join(sorted(timestamps_db))
+                ))
+                return util.SUPPLY_NONE
+            return supplier
 
         @staticmethod
         def from_file(path):
@@ -575,7 +694,7 @@ init 90 python in _fom_presence_config:
                     _report_config_problem(
                         "loading", rel_file,
                         "Could not load config {0}, see log/submod_log.log.".format(rel_file),
-                        "Could not load presence config from file {0}: {1}.".format(rel_file, e)
+                        u"Could not load presence config from file {0}: {1}.".format(_to_text(rel_file), _to_text(e))
                     )
                     continue
 
@@ -710,8 +829,27 @@ init 90 python in _fom_presence_config:
         for config in failed:
             remove(config)
 
-        for config in configs.values():
+        for config in list(configs.values()):
             config.finalize()
+
+            # Configs that can be chosen must end up with an application ID;
+            # others may be just bases for inheritance.
+            if config.app_id is None and config.condition_code is not None and not config.disable:
+                _report_config_problem(
+                    "invalid", config.file,
+                    "Config {0} can't be used, see log/submod_log.log.".format(config.file),
+                    "Presence config {0} has no ApplicationID (neither set in [Client] nor inherited), so it can't be used.".format(config.file)
+                )
+                remove(config)
+                continue
+
+            if config.warnings:
+                _report_config_problem(
+                    "warnings", config.file,
+                    "Config {0} has warnings, see log/submod_log.log.".format(config.file),
+                    u"Presence config {0} has warnings: {1}.".format(config.file, "; ".join(config.warnings)),
+                    status.WARNING
+                )
 
         return configs, ids, paths
 
