@@ -15,12 +15,12 @@ init 90 python in _fom_presence_config:
 
     import sys
     import os
+    import io
     import time
     import traceback
 
     if sys.version_info.major == 2:
         import ConfigParser as configparser
-        import io
     else:
         import configparser
 
@@ -267,7 +267,7 @@ init 90 python in _fom_presence_config:
                     File opened in the provided mode with provided encoding.
             """
 
-            return io.open(path, mode, encoding="utf-8")
+            return io.open(path, mode, encoding=encoding)
     else:
         def _open_with_encoding(path, mode, encoding="utf-8"):
             """
@@ -288,7 +288,7 @@ init 90 python in _fom_presence_config:
                     File opened in the provided mode with provided encoding.
             """
 
-            return open(path, mode, encoding="utf-8")
+            return open(path, mode, encoding=encoding)
 
     class _ParserWrapper(object):
         """
@@ -460,9 +460,16 @@ init 90 python in _fom_presence_config:
                     Config loaded from file.
             """
 
-            c = configparser.ConfigParser()
             with _open_with_encoding(path, "r", encoding="utf-8") as f:
-                c.readfp(f, path.replace("\\", "/"))
+                text = f.read()
+
+            # Editors such as Windows Notepad may save files with a UTF-8 BOM,
+            # which ConfigParser would take for part of the first line.
+            if text.startswith(u"\ufeff"):
+                text = text[1:]
+
+            c = configparser.ConfigParser()
+            c.readfp(io.StringIO(text), path.replace("\\", "/"))
 
             config = Config(_ParserWrapper(c))
             config._file = path
