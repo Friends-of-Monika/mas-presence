@@ -563,6 +563,24 @@ init 90 python in _fom_presence_config:
             return a
 
 
+    def _eval_condition(code):
+        """
+        Evaluates compiled config condition in global Ren'Py scope.
+
+        IN:
+            code -> code:
+                Compiled condition, see Config.condition_code.
+
+        OUT:
+            any:
+                Result of the condition.
+        """
+
+        # Store is passed as globals (not locals) so that nested scopes such
+        # as generator expressions and lambdas can see store variables too.
+        return eval(code, store.__dict__)
+
+
     _config_dir = os.path.join(mod.basedir, "config")
     _configs = list()
     _config_id_map = dict()
@@ -695,7 +713,7 @@ init 90 python in _fom_presence_config:
                 try:
                     config = Config.from_file(_file)
                     if config.condition_code is not None:
-                        eval(config.condition_code, dict(), store.__dict__)
+                        _eval_condition(config.condition_code)
                     config._file = rel_file
                 except Exception as e:
                     _report_config_problem(
@@ -874,7 +892,7 @@ init 90 python in _fom_presence_config:
         for rel_file, conf in _configs:
             if not conf.disable and conf.condition_code is not None:
                 try:
-                    result = bool(eval(conf.condition_code, dict(), store.__dict__))
+                    result = bool(_eval_condition(conf.condition_code))
                 except Exception as e:
                     _report_config_problem(
                         "condition", rel_file,
