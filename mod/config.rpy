@@ -242,6 +242,9 @@ init 90 python in _fom_presence_config:
 
         return s.strip()
 
+    # Stands in for semicolons while config is parsed, see Config.from_file.
+    _SEMICOLON = u"\ue000"
+
     # Known sections and keys (lowercase, as ConfigParser lowercases keys.)
     _SCHEMA = {
         "Presence": ("condition", "priority", "dynamic", "id", "inherit", "override", "disable"),
@@ -332,7 +335,7 @@ init 90 python in _fom_presence_config:
             """
 
             try:
-                raw = self._parser.get(section, value, raw=True)
+                raw = self._parser.get(section, value, raw=True).replace(_SEMICOLON, u";")
             except (configparser.NoOptionError, configparser.NoSectionError):
                 return default
 
@@ -365,7 +368,7 @@ init 90 python in _fom_presence_config:
 
                 for key in self._parser.options(section):
                     if key not in defaults and key not in _SCHEMA[section]:
-                        problems.append(u"unknown key {0} in [{1}] is ignored".format(key, section))
+                        problems.append(u"unknown key {0} in [{1}] is ignored".format(key.replace(_SEMICOLON, u";"), section))
 
             return problems
 
@@ -442,6 +445,9 @@ init 90 python in _fom_presence_config:
             name = parser.get_value("Timestamps", key, _parse_str, _UNSET)
             if name is _UNSET:
                 return _UNSET
+            if not name:
+                # Empty value clears timestamp, same as None.
+                return util.SUPPLY_NONE
 
             supplier = _parse_ts_supplier(name)
             if supplier is None:
@@ -472,6 +478,14 @@ init 90 python in _fom_presence_config:
             # which ConfigParser would take for part of the first line.
             if text.startswith(u"\ufeff"):
                 text = text[1:]
+
+            # Python 2 ConfigParser cuts values at " ;" (inline comment) with
+            # no way to turn it off, so semicolons outside of comment lines
+            # are hidden from it and restored in _ParserWrapper.get_value.
+            text = u"".join(
+                line if line.startswith((u"#", u";", u"[")) else line.replace(u";", _SEMICOLON)
+                for line in text.splitlines(True)
+            )
 
             c = configparser.ConfigParser()
             c.readfp(io.StringIO(text), path.replace("\\", "/"))
