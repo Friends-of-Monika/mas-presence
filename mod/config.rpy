@@ -55,6 +55,10 @@ init 90 python in _fom_presence_config:
 
     _STATUS_CONFIG_PREFIX = "config:"
 
+    # Text of the activity being built does not fit Discord limits; only the
+    # most recently built activity matters, so there is a single entry.
+    _STATUS_TEXT = _STATUS_CONFIG_PREFIX + "text"
+
     def _report_config_problem(kind, rel_file, ui_message, log_message, level=status.ERROR):
         status.set(
             "{0}{1}:{2}".format(_STATUS_CONFIG_PREFIX, kind, rel_file),
@@ -426,6 +430,7 @@ init 90 python in _fom_presence_config:
             self.stop_ts = self._get_timestamp(parser, "End")
 
             self._activity = None
+            self._text_problems = []
             self._file = None
 
         def _get_timestamp(self, parser, key):
@@ -530,36 +535,61 @@ init 90 python in _fom_presence_config:
             stored in _activity and then retrieved from it on next call, not
             re-evaluating suppliers and not building fresh Activity.
 
+            NOTE:
+                Text that does not fit Discord limits is padded or shortened,
+                which is reported to status module (and cleared once text of
+                activity being built fits again.)
+
             OUT:
                 Activity:
                     Activity based on properties this Config instance has.
             """
 
-            if self._activity is not None:
-                return self._activity
+            a = self._activity
+            if a is None:
+                a = self._build_activity()
+                if not self.dynamic:
+                    self._activity = a
+
+            if self._text_problems:
+                status.set(
+                    _STATUS_TEXT,
+                    "Config {0} has text that was shortened or padded, see log/submod_log.log.".format(self.file),
+                    u"Presence config {0} has text Discord can't show as is: {1}.".format(
+                        _to_text(self.file), "; ".join(self._text_problems)
+                    ),
+                    status.WARNING
+                )
+            else:
+                status.clear(_STATUS_TEXT)
+            return a
+
+        def _build_activity(self):
+            problems = []
+
+            def text(key, supplier):
+                value, problem = discord.fit_text(supplier.get())
+                if problem == discord.TEXT_SHORT:
+                    problems.append(u"{0} is shorter than {1} characters and was padded".format(key, discord.TEXT_MIN))
+                elif problem == discord.TEXT_LONG:
+                    problems.append(u"{0} is longer than {1} characters and was shortened".format(key, discord.TEXT_MAX))
+                return value
+
             a = discord.Activity()
+            a.state = text("State", self.state)
+            a.details = text("Details", self.details)
 
-            if self.state is not None:
-                a.state = self.state.get()
-            if self.details is not None:
-                a.details = self.details.get()
-
-            if self.start_ts is not None:
-                a.timestamps.start = self.start_ts.get()
-            if self.stop_ts is not None:
-                a.timestamps.end = self.stop_ts.get()
+            a.timestamps.start = self.start_ts.get()
+            a.timestamps.end = self.stop_ts.get()
 
             if self.large_image is not None:
                 a.assets.large_image = self.large_image
-                if self.large_text is not None:
-                    a.assets.large_text = self.large_text.get()
+                a.assets.large_text = text("LargeText", self.large_text)
             if self.small_image is not None:
                 a.assets.small_image = self.small_image
-                if self.small_text is not None:
-                    a.assets.small_text = self.small_text.get()
+                a.assets.small_text = text("SmallText", self.small_text)
 
-            if not self.dynamic:
-                self._activity = a
+            self._text_problems = problems
             return a
 
 

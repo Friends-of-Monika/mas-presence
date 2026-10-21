@@ -367,6 +367,90 @@ init -90 python in _fom_presence_discord:
         logging.DEFAULT.debug("Using Unix socket for Discord IPC.")
 
 
+    # Activity text limits
+
+    # Discord rejects activity text fields (details, state, image captions)
+    # shorter or longer than this, counted in UTF-16 code units.
+    TEXT_MIN = 2
+    TEXT_MAX = 128
+
+    # Appended to text that is too short; a blank Braille pattern renders as
+    # blank, but unlike spaces is not trimmed.
+    _TEXT_PAD = u"\u2800"
+    _TEXT_ELLIPSIS = u"\u2026"
+
+    TEXT_SHORT = "short"
+    TEXT_LONG = "long"
+
+    def _text_units(c):
+        # Characters outside of BMP take two UTF-16 code units; on narrow
+        # Python builds they are already two (surrogate) characters.
+        return 2 if ord(c) > 0xFFFF else 1
+
+    def text_length(text):
+        """
+        Returns length of text as Discord counts it (in UTF-16 code units.)
+
+        IN:
+            text -> unicode:
+                Text to measure.
+
+        OUT:
+            int:
+                Length of text.
+        """
+
+        return sum(_text_units(c) for c in text)
+
+    def fit_text(text):
+        """
+        Fits text into Discord limits for activity text fields: whitespace is
+        trimmed, empty text is omitted, too short text is padded with a blank
+        character and too long text is shortened with an ellipsis.
+
+        IN:
+            text -> str or None:
+                Text to fit.
+
+        OUT:
+            tuple of (text, problem):
+                text -> unicode or None:
+                    Fitted text, or None if text should be omitted.
+
+                problem -> str or None:
+                    TEXT_SHORT or TEXT_LONG if text had to be changed,
+                    None otherwise.
+        """
+
+        if text is None:
+            return None, None
+        if isinstance(text, bytes):
+            text = text.decode("utf-8", "replace")
+
+        text = text.strip()
+        if not text:
+            return None, None
+
+        length = text_length(text)
+        if length < TEXT_MIN:
+            return text + _TEXT_PAD * (TEXT_MIN - length), TEXT_SHORT
+        if length <= TEXT_MAX:
+            return text, None
+
+        limit = TEXT_MAX - text_length(_TEXT_ELLIPSIS)
+        chars, used = [], 0
+        for c in text:
+            used += _text_units(c)
+            if used > limit:
+                break
+            chars.append(c)
+
+        # Do not leave half of a surrogate pair behind on narrow builds.
+        if chars and 0xD800 <= ord(chars[-1]) <= 0xDBFF:
+            chars.pop()
+        return u"".join(chars).rstrip() + _TEXT_ELLIPSIS, TEXT_LONG
+
+
     # User activity wrapper class definitions
 
     class Assets(object):
