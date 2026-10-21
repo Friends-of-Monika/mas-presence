@@ -730,11 +730,7 @@ init 90 python in _fom_presence_config:
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
-                if not (
-                    _file.endswith(".ini") or
-                    _file.endswith(".cfg") or
-                    _file.endswith(".conf")
-                ):
+                if not _file.lower().endswith((".ini", ".cfg", ".conf")):
                     continue
 
                 _file = os.path.join(_dir, _file)
