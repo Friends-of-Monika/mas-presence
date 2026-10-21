@@ -55,6 +55,7 @@ init 100 python in _fom_presence:
     # Keys of problems shown in settings pane (see status.rpy.)
     _STATUS_CONNECTION = "connection"
     _STATUS_ACTIVITY = "activity"
+    _STATUS_BUILD = "activity:build"
 
 
     def _hash_activity(app_id, activity):
@@ -347,6 +348,7 @@ init 100 python in _fom_presence:
 
             status.clear(_STATUS_CONNECTION)
             status.clear(_STATUS_ACTIVITY)
+            status.clear(_STATUS_BUILD)
 
             if self._worker is not None:
                 self._worker.submit(self._session.disconnect)
@@ -407,7 +409,21 @@ init 100 python in _fom_presence:
         def _submit(self, op, with_config, key=None, force=False):
             app_id, activity = None, None
             if with_config is not None:
-                app_id, activity = with_config.app_id, with_config.to_activity()
+                # Activity that can't be built (e.g. text refers to undefined
+                # variable) is not sent, so Discord keeps showing the previous
+                # one; the error is logged once until activity builds again.
+                try:
+                    app_id, activity = with_config.app_id, with_config.to_activity()
+                except Exception as e:
+                    status.set(
+                        _STATUS_BUILD,
+                        "Activity error in config {0}, see log/submod_log.log.".format(with_config.file),
+                        u"Could not build activity from presence config {0}:\n{1}".format(
+                            config._to_text(with_config.file), config._to_text(traceback.format_exc())
+                        )
+                    )
+                    return False
+                status.clear(_STATUS_BUILD)
 
             activity_hash = _hash_activity(app_id, activity)
             fresh = self._sent_at is not None and time.time() - self._sent_at < _REFRESH_INTERVAL
