@@ -178,8 +178,16 @@ to edit it, you can use a path (relative to config directory) instead:
 Override = default/configs/default.conf
 ```
 
-Taking possible override conflicts into account, if there are is more than one
-override existing for a certain config, one with higher priority prevails.
+Taking possible override conflicts into account, if there is more than one
+override existing for a certain config, one with higher priority prevails, and
+the others are not used (the settings pane shows a warning about them).
+
+An overriding config can be overridden again, for example, to change a config
+pack that itself overrides default configs. Each override then works as a layer
+on top of the config it replaces: the ID and path of every config in the chain
+refer to the topmost one, and an override that also inherits from a config
+below it gets the layer directly beneath itself. If an override can't be loaded
+(e.g. it inherits from nonexistent config), the layer below it is used instead.
 
 ### Disabling
 

@@ -771,20 +771,11 @@ init 90 python in _fom_presence_config:
                 status.WARNING
             )
 
-        def remove(config):
-            # Configs may be removed more than once (e.g. losing override that
-            # also fails inheritance) and may share ID with another config, so
-            # only drop map entries that still point to this config.
-            configs.pop(config.file, None)
-            if paths.get(config.file) is config:
-                del paths[config.file]
-            if config.id is not None and ids.get(config.id) is config:
-                del ids[config.id]
-
-        # Build override map (config to override to list of configs willing to
-        # override it); references are resolved first so that the same config
-        # referenced by ID and by path is treated as one.
-        override_map = dict()
+        # Build override chains: each config overridden by a config (the one
+        # with the highest priority, then the first by path, if there are
+        # several) is a layer below it; references are resolved first so that
+        # the same config referenced by ID and by path is treated as one.
+        candidates = dict()
         for config in sorted(configs.values(), key=_load_order):
             if config.override_id is None:
                 continue
@@ -798,34 +789,74 @@ init 90 python in _fom_presence_config:
                 )
                 continue
 
-            override_map.setdefault(target, []).append(config)
+            candidates.setdefault(target, []).append(config)
 
-        # Keep configs replaced by overrides reachable for overrides that also
-        # inherit from the config they replace.
-        replaced = dict()
+        failed = set()
 
-        # Apply overrides. Overrides are already sorted by priority, so the
-        # first one wins.
-        for target in sorted(override_map, key=lambda it: it.file):
-            overrides = override_map[target]
-            for rem_conf in (overrides[1:] + [target]):
-                remove(rem_conf)
+        above = dict()
+        for target, overrides in candidates.items():
+            above[target] = overrides[0]
+            for loser in overrides[1:]:
+                failed.add(loser)
+                _report_config_problem(
+                    "override", loser.file,
+                    "Config {0} is not used, config {1} overrides the same config.".format(loser.file, overrides[0].file),
+                    "Presence config {0} is not used: it overrides config {1}, but so does config {2} which takes precedence.".format(loser.file, target.file, overrides[0].file),
+                    status.WARNING
+                )
 
-            # Override takes place of the replaced config under both its ID
-            # and path, so that both keep referring to it.
-            override = overrides[0]
-            if target.id is not None:
-                override.id = target.id
-                ids[target.id] = override
-            paths[target.file] = override
-            replaced[override] = target
+        # Configs overriding each other in a loop can't be used.
+        cycles = []
+        in_cycle = set()
+        for target in sorted(above, key=lambda it: it.file):
+            seen = []
+            config = target
+            while config in above and config not in seen:
+                seen.append(config)
+                config = above[config]
+            if config in seen and config not in in_cycle:
+                cycle = seen[seen.index(config):]
+                in_cycle.update(cycle)
+                cycles.append(cycle)
+
+        for cycle in cycles:
+            cycle_str = " -> ".join(it.file for it in cycle + cycle[:1])
+            for member in cycle:
+                failed.add(member)
+                _report_config_problem(
+                    "override", member.file,
+                    "Config {0} is part of override cycle, see log/submod_log.log.".format(member.file),
+                    "Presence config {0} is part of override cycle: {1}.".format(member.file, cycle_str)
+                )
+        for cycle in cycles:
+            for member in cycle:
+                above.pop(member, None)
+
+        def layers(config):
+            # Config and the configs overriding it, bottom to top.
+            result = [config]
+            while result[-1] in above:
+                result.append(above[result[-1]])
+            return result
 
         inherited = set()
-        failed = set()
 
         def report_inheritance(config, ui_message, log_message):
             failed.add(config)
             _report_config_problem("inheritance", config.file, ui_message, log_message)
+
+        def resolve(config, viewer, chain):
+            # Returns the config that takes place of the provided one: the
+            # topmost layer that could be loaded, or, for a layer of the same
+            # chain, the nearest layer below it. Returns None if none could be
+            # loaded.
+            stack = layers(config)
+            if viewer in stack:
+                stack = stack[:stack.index(viewer)]
+            for layer in reversed(stack):
+                if inherit(layer, chain):
+                    return layer
+            return None
 
         def inherit(config, chain):
             if config in inherited:
@@ -845,12 +876,8 @@ init 90 python in _fom_presence_config:
                 return False
 
             if config.inherit_id is not None:
-                parent = _lookup(config.inherit_id, ids, paths)
-                if parent is config and config in replaced:
-                    # Override inheriting from the config it replaces.
-                    parent = replaced[config]
-
-                if parent is None:
+                ref = _lookup(config.inherit_id, ids, paths)
+                if ref is None:
                     report_inheritance(
                         config,
                         "Config {0} inherits unknown config ID {1}.".format(config.file, config.inherit_id),
@@ -858,12 +885,13 @@ init 90 python in _fom_presence_config:
                     )
                     return False
 
-                if not inherit(parent, chain + [config]):
+                parent = resolve(ref, config, chain + [config])
+                if parent is None:
                     if config not in failed:
                         report_inheritance(
                             config,
-                            "Config {0} inherits from config {1} that could not be loaded.".format(config.file, parent.file),
-                            "Presence config {0} inherits from config {1} that could not be loaded.".format(config.file, parent.file)
+                            "Config {0} inherits from config {1} that could not be loaded.".format(config.file, ref.file),
+                            "Presence config {0} inherits from config {1} that could not be loaded.".format(config.file, ref.file)
                         )
                     return False
 
@@ -872,15 +900,23 @@ init 90 python in _fom_presence_config:
             inherited.add(config)
             return True
 
-        # Apply inheritance to remaining configs; parents (including removed
-        # ones) are resolved recursively.
+        # Every ID and path now refers to the config that takes place of the
+        # config it belonged to; configs nothing refers to are not used.
+        final = dict()
         for config in sorted(configs.values(), key=_load_order):
-            inherit(config, [])
+            final[config] = resolve(config, None, [])
 
-        for config in failed:
-            remove(config)
+        final_ids = dict((_id, final[config]) for _id, config in ids.items() if final[config] is not None)
+        final_paths = dict((path, final[config]) for path, config in paths.items() if final[config] is not None)
+        final_configs = dict((config.file, config) for config in set(final_paths.values()))
 
-        for config in list(configs.values()):
+        def remove(config):
+            final_configs.pop(config.file, None)
+            for refs in (final_ids, final_paths):
+                for ref in [ref for ref, it in refs.items() if it is config]:
+                    del refs[ref]
+
+        for config in list(final_configs.values()):
             config.finalize()
 
             # Configs that can be chosen must end up with an application ID;
@@ -902,7 +938,7 @@ init 90 python in _fom_presence_config:
                     status.WARNING
                 )
 
-        return configs, ids, paths
+        return final_configs, final_ids, final_paths
 
     def get_active_config():
         """
