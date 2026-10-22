@@ -24,6 +24,7 @@ init 100 python in fom_presence_extensions:
     import store
     from store import _fom_presence_logging as logging
     from store import _fom_presence_status as status
+    from store import _fom_presence_util as util
 
 
     _CVARS_SINGLE = 0
@@ -52,7 +53,7 @@ init 100 python in fom_presence_extensions:
 
             # Variable sets have no name, so tell them apart by supplier.
             label = name if name is not None else getattr(supplier, "__name__", "<set>")
-            key = "cvar:{0}".format(label)
+            key = util.format_text("cvar:{0}", label)
 
             try:
                 if _type == _CVARS_SINGLE:
@@ -63,8 +64,8 @@ init 100 python in fom_presence_extensions:
             except Exception as e:
                 status.set(
                     key,
-                    "Could not update custom variable {0}, see log/submod_log.log.".format(label),
-                    "[Custom Variables] Could not update custom variable {0}: {1}".format(label, e),
+                    util.format_text("Could not update custom variable {0}, see log/submod_log.log.", label),
+                    util.format_text("[Custom Variables] Could not update custom variable {0}: {1}", label, e),
                     status.WARNING
                 )
                 continue

@@ -12,6 +12,55 @@ init -1000 python in _fom_presence_util:
     import io
     import sys
 
+    try:
+        _text_type = unicode
+    except NameError:
+        _text_type = str
+
+    def to_text(value):
+        """
+        Converts value (e.g. exception, path or ID) to text without failing on
+        non-ASCII characters, whether value is a byte or text string.
+
+        IN:
+            value -> any:
+                Value to convert.
+
+        OUT:
+            unicode (str on Python 3):
+                Text representation of value.
+        """
+
+        if isinstance(value, _text_type):
+            return value
+        if isinstance(value, bytes):
+            return value.decode("utf-8", "replace")
+        try:
+            return _text_type(value)
+        except UnicodeError:
+            # Python 2 exceptions with non-ASCII byte string messages.
+            return str(value).decode("utf-8", "replace")
+
+    def format_text(template, *args):
+        """
+        Formats message (e.g. for log or status) with positional arguments
+        converted to text first, so that mixing byte and text strings with
+        non-ASCII characters does not fail on Python 2.
+
+        IN:
+            template -> str:
+                Format string with {0}, {1}, ... placeholders.
+
+            *args:
+                Values to substitute, converted with to_text.
+
+        OUT:
+            unicode (str on Python 3):
+                Formatted message.
+        """
+
+        return to_text(template).format(*[to_text(arg) for arg in args])
+
     def get_script_file(fallback=None, relative=False):
         """
         Uses internal Ren'Py function renpy.get_filename_line() to locate

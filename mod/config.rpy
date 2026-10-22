@@ -25,32 +25,6 @@ init 90 python in _fom_presence_config:
         import configparser
 
 
-    def _to_text(value):
-        """
-        Converts value (e.g. exception or byte string path) to text for log
-        messages without failing on non-ASCII characters.
-
-        IN:
-            value -> any:
-                Value to convert.
-
-        OUT:
-            unicode:
-                Text representation of value.
-        """
-
-        if sys.version_info.major != 2:
-            return str(value)
-        if isinstance(value, unicode):
-            return value
-        if isinstance(value, str):
-            return value.decode("utf-8", "replace")
-        try:
-            return unicode(value)
-        except UnicodeError:
-            return str(value).decode("utf-8", "replace")
-
-
     # Problems shown in settings pane (see status.rpy)
 
     _STATUS_CONFIG_PREFIX = "config:"
@@ -61,7 +35,7 @@ init 90 python in _fom_presence_config:
 
     def _report_config_problem(kind, rel_file, ui_message, log_message, level=status.ERROR):
         status.set(
-            "{0}{1}:{2}".format(_STATUS_CONFIG_PREFIX, kind, rel_file),
+            util.format_text("{0}{1}:{2}", _STATUS_CONFIG_PREFIX, kind, rel_file),
             ui_message, log_message, level
         )
 
@@ -342,7 +316,7 @@ init 90 python in _fom_presence_config:
             try:
                 return deserializer(raw)
             except Exception as e:
-                raise ValueError(u"invalid value of {0} in [{1}]: \"{2}\" ({3})".format(value, section, raw.strip(), e))
+                raise ValueError(util.format_text(u"invalid value of {0} in [{1}]: \"{2}\" ({3})", value, section, raw.strip(), e))
 
         def find_unknown(self):
             """
@@ -401,7 +375,7 @@ init 90 python in _fom_presence_config:
                     try:
                         condition_code = compile(condition, "<string>", "eval")
                     except SyntaxError as e:
-                        raise ValueError(u"invalid Condition in [Presence]: {0}".format(e))
+                        raise ValueError(util.format_text("invalid Condition in [Presence]: {0}", e))
                 else:
                     condition = None
             self.condition = condition
@@ -568,9 +542,10 @@ init 90 python in _fom_presence_config:
             if self._text_problems:
                 status.set(
                     _STATUS_TEXT,
-                    "Config {0} has text that was shortened or padded, see log/submod_log.log.".format(self.file),
-                    u"Presence config {0} has text Discord can't show as is: {1}.".format(
-                        _to_text(self.file), "; ".join(self._text_problems)
+                    util.format_text("Config {0} has text that was shortened or padded, see log/submod_log.log.", self.file),
+                    util.format_text(
+                        "Presence config {0} has text Discord can't show as is: {1}.",
+                        self.file, "; ".join(self._text_problems)
                     ),
                     status.WARNING
                 )
@@ -758,8 +733,8 @@ init 90 python in _fom_presence_config:
                 except Exception as e:
                     _report_config_problem(
                         "loading", rel_file,
-                        "Could not load config {0}, see log/submod_log.log.".format(rel_file),
-                        u"Could not load presence config from file {0}: {1}.".format(_to_text(rel_file), _to_text(e))
+                        util.format_text("Could not load config {0}, see log/submod_log.log.", rel_file),
+                        util.format_text("Could not load presence config from file {0}: {1}.", rel_file, e)
                     )
                     continue
 
@@ -780,8 +755,8 @@ init 90 python in _fom_presence_config:
 
             _report_config_problem(
                 "clash", config.file,
-                "Config {0} has ID {1} already used by config {2}.".format(config.file, config.id, owner.file),
-                "Presence config {0} has ID {1} already used by config {2} (which takes precedence.)".format(config.file, config.id, owner.file),
+                util.format_text("Config {0} has ID {1} already used by config {2}.", config.file, config.id, owner.file),
+                util.format_text("Presence config {0} has ID {1} already used by config {2} (which takes precedence.)", config.file, config.id, owner.file),
                 status.WARNING
             )
 
@@ -798,8 +773,8 @@ init 90 python in _fom_presence_config:
             if target is None or target is config:
                 _report_config_problem(
                     "override", config.file,
-                    "Config {0} overrides unknown config ID {1}.".format(config.file, config.override_id),
-                    "Presence config {0} overrides nonexistent config ID: {1}.".format(config.file, config.override_id)
+                    util.format_text("Config {0} overrides unknown config ID {1}.", config.file, config.override_id),
+                    util.format_text("Presence config {0} overrides nonexistent config ID: {1}.", config.file, config.override_id)
                 )
                 continue
 
@@ -814,8 +789,8 @@ init 90 python in _fom_presence_config:
                 failed.add(loser)
                 _report_config_problem(
                     "override", loser.file,
-                    "Config {0} is not used, config {1} overrides the same config.".format(loser.file, overrides[0].file),
-                    "Presence config {0} is not used: it overrides config {1}, but so does config {2} which takes precedence.".format(loser.file, target.file, overrides[0].file),
+                    util.format_text("Config {0} is not used, config {1} overrides the same config.", loser.file, overrides[0].file),
+                    util.format_text("Presence config {0} is not used: it overrides config {1}, but so does config {2} which takes precedence.", loser.file, target.file, overrides[0].file),
                     status.WARNING
                 )
 
@@ -834,13 +809,13 @@ init 90 python in _fom_presence_config:
                 cycles.append(cycle)
 
         for cycle in cycles:
-            cycle_str = " -> ".join(it.file for it in cycle + cycle[:1])
+            cycle_str = u" -> ".join(util.to_text(it.file) for it in cycle + cycle[:1])
             for member in cycle:
                 failed.add(member)
                 _report_config_problem(
                     "override", member.file,
-                    "Config {0} is part of override cycle, see log/submod_log.log.".format(member.file),
-                    "Presence config {0} is part of override cycle: {1}.".format(member.file, cycle_str)
+                    util.format_text("Config {0} is part of override cycle, see log/submod_log.log.", member.file),
+                    util.format_text("Presence config {0} is part of override cycle: {1}.", member.file, cycle_str)
                 )
         for cycle in cycles:
             for member in cycle:
@@ -880,12 +855,12 @@ init 90 python in _fom_presence_config:
 
             if config in chain:
                 cycle = chain[chain.index(config):] + [config]
-                cycle_str = " -> ".join(it.file for it in cycle)
+                cycle_str = u" -> ".join(util.to_text(it.file) for it in cycle)
                 for member in cycle[:-1]:
                     report_inheritance(
                         member,
-                        "Config {0} is part of inheritance cycle, see log/submod_log.log.".format(member.file),
-                        "Presence config {0} is part of inheritance cycle: {1}.".format(member.file, cycle_str)
+                        util.format_text("Config {0} is part of inheritance cycle, see log/submod_log.log.", member.file),
+                        util.format_text("Presence config {0} is part of inheritance cycle: {1}.", member.file, cycle_str)
                     )
                 return False
 
@@ -894,8 +869,8 @@ init 90 python in _fom_presence_config:
                 if ref is None:
                     report_inheritance(
                         config,
-                        "Config {0} inherits unknown config ID {1}.".format(config.file, config.inherit_id),
-                        "Presence config {0} inherits nonexistent config ID: {1}.".format(config.file, config.inherit_id)
+                        util.format_text("Config {0} inherits unknown config ID {1}.", config.file, config.inherit_id),
+                        util.format_text("Presence config {0} inherits nonexistent config ID: {1}.", config.file, config.inherit_id)
                     )
                     return False
 
@@ -904,8 +879,8 @@ init 90 python in _fom_presence_config:
                     if config not in failed:
                         report_inheritance(
                             config,
-                            "Config {0} inherits from config {1} that could not be loaded.".format(config.file, ref.file),
-                            "Presence config {0} inherits from config {1} that could not be loaded.".format(config.file, ref.file)
+                            util.format_text("Config {0} inherits from config {1} that could not be loaded.", config.file, ref.file),
+                            util.format_text("Presence config {0} inherits from config {1} that could not be loaded.", config.file, ref.file)
                         )
                     return False
 
@@ -938,8 +913,8 @@ init 90 python in _fom_presence_config:
             if config.app_id is None and config.condition_code is not None and not config.disable:
                 _report_config_problem(
                     "invalid", config.file,
-                    "Config {0} can't be used, see log/submod_log.log.".format(config.file),
-                    "Presence config {0} has no ApplicationID (neither set in [Client] nor inherited), so it can't be used.".format(config.file)
+                    util.format_text("Config {0} can't be used, see log/submod_log.log.", config.file),
+                    util.format_text("Presence config {0} has no ApplicationID (neither set in [Client] nor inherited), so it can't be used.", config.file)
                 )
                 remove(config)
                 continue
@@ -947,8 +922,8 @@ init 90 python in _fom_presence_config:
             if config.warnings:
                 _report_config_problem(
                     "warnings", config.file,
-                    "Config {0} has warnings, see log/submod_log.log.".format(config.file),
-                    u"Presence config {0} has warnings: {1}.".format(config.file, "; ".join(config.warnings)),
+                    util.format_text("Config {0} has warnings, see log/submod_log.log.", config.file),
+                    util.format_text("Presence config {0} has warnings: {1}.", config.file, "; ".join(config.warnings)),
                     status.WARNING
                 )
 
@@ -972,12 +947,12 @@ init 90 python in _fom_presence_config:
                 except Exception as e:
                     _report_config_problem(
                         "condition", rel_file,
-                        "Could not evaluate condition of config {0}, see log/submod_log.log.".format(rel_file),
-                        "Could not evaluate condition of presence config {0}: {1}.".format(rel_file, e)
+                        util.format_text("Could not evaluate condition of config {0}, see log/submod_log.log.", rel_file),
+                        util.format_text("Could not evaluate condition of presence config {0}: {1}.", rel_file, e)
                     )
                     continue
 
-                status.clear("{0}condition:{1}".format(_STATUS_CONFIG_PREFIX, rel_file))
+                status.clear(util.format_text("{0}condition:{1}", _STATUS_CONFIG_PREFIX, rel_file))
                 if result:
                     return conf
 

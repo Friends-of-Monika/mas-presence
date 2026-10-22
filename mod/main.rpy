@@ -10,6 +10,7 @@ init 100 python in _fom_presence:
     from store import _fom_presence_discord as discord
     from store import _fom_presence_logging as logging
     from store import _fom_presence_worker as worker
+    from store import _fom_presence_util as util
 
     import socket
     import datetime
@@ -104,7 +105,7 @@ init 100 python in _fom_presence:
             self.set_status(
                 _STATUS_ACTIVITY,
                 "Could not set Rich Presence activity, see log/submod_log.log.",
-                "Could not set activity: {0}.".format(e)
+                util.format_text("Could not set activity: {0}.", e)
             )
 
 
@@ -176,7 +177,7 @@ init 100 python in _fom_presence:
             outcome.set_status(
                 _STATUS_CONNECTION,
                 "Connection with Discord lost.",
-                "Connection with Discord lost: {0}.".format(e)
+                util.format_text("Connection with Discord lost: {0}.", e)
             )
             self.disconnect()
             outcome.connected = False
@@ -243,7 +244,7 @@ init 100 python in _fom_presence:
             outcome.set_status(
                 _STATUS_CONNECTION,
                 "Could not connect to Discord.",
-                "Could not connect to Discord RPC: {0}.".format(e)
+                util.format_text("Could not connect to Discord RPC: {0}.", e)
             )
 
 
@@ -417,9 +418,10 @@ init 100 python in _fom_presence:
                 except Exception as e:
                     status.set(
                         _STATUS_BUILD,
-                        "Activity error in config {0}, see log/submod_log.log.".format(with_config.file),
-                        u"Could not build activity from presence config {0}:\n{1}".format(
-                            config._to_text(with_config.file), config._to_text(traceback.format_exc())
+                        util.format_text("Activity error in config {0}, see log/submod_log.log.", with_config.file),
+                        util.format_text(
+                            "Could not build activity from presence config {0}:\n{1}",
+                            with_config.file, traceback.format_exc()
                         )
                     )
                     return False
