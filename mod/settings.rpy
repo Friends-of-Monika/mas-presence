@@ -90,7 +90,7 @@ init 100 python in _fom_presence_settings:
         mod.presence.connect()
 
     def reload_activity():
-        mod.presence.update()
+        mod.presence.update(force=True)
 
     def reload_configs():
         config.reload_configs()
