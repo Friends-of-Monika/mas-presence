@@ -22,6 +22,57 @@ init 190 python in fom_presence_extensions:
         _fom_events_ignored.append(key)
 
 
+    def _fom_get_upcoming_events(n_days):
+        """
+        Finds calendar events within next N days.
+
+        IN:
+            n_days -> int:
+                Amount of days to scan for upcoming events.
+
+        OUT:
+            List of tuples of the following items, closest events first:
+                [0]: amount of days until upcoming event
+                [1]: event prompt
+                [2]: event key
+                [3]: event starting date
+        """
+
+        events = list()
+
+        today = datetime.date.today()
+        cur = today
+        for i in range(n_days):
+            ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
+            for ev_key, ev_tup in ev_dict.items():
+                if ev_key in _fom_events_ignored:
+                    continue
+
+                if ev_tup[0] == mas_calendar.CAL_TYPE_EV:
+                    ev = mas_getEV(ev_key)
+                    prompt = ev.prompt
+                    years = ev.years
+                    sd = ev.start_date
+
+                else:
+                    # Repeatable entries are on this day in every listed year
+                    # (or every year if none are listed.)
+                    prompt = ev_tup[1]
+                    years = ev_tup[2]
+                    sd = datetime.datetime.combine(cur, datetime.time())
+
+                if sd is not None and sd.date() < cur:
+                    continue
+
+                if years is None or len(years) == 0 or cur.year in years:
+                    events.append((cur - today, prompt, ev_key, sd))
+
+            cur += datetime.timedelta(days=1)
+
+        # Days are scanned in order, so events are already sorted by days
+        # until event (start date can't be used, it may be None.)
+        return events
+
     def _fom_get_next_event(n_days):
         """
         Finds the closest calendar event within next N days. If none found,
@@ -42,42 +93,9 @@ init 190 python in fom_presence_extensions:
                 If no upcoming events were found.
         """
 
-        events = list()
-
-        _fom_presence_logging = store._fom_presence_logging
-
-        cur = datetime.date.today()
-        for i in range(n_days):
-            ev_dict = mas_calendar.calendar_database[cur.month][cur.day]
-            for ev_key, ev_tup in ev_dict.items():
-                if ev_key in _fom_events_ignored:
-                    continue
-
-                if ev_tup[0] == mas_calendar.CAL_TYPE_EV:
-                    ev = mas_getEV(ev_key)
-                    prompt = ev.prompt
-                    years = ev.years
-                    sd = ev.start_date
-
-                else:
-                    prompt = ev_tup[1]
-                    years = ev_tup[2] or [cur.year]
-                    sd = datetime.datetime.combine(datetime.date(min(years), cur.month, cur.day), datetime.time())
-
-                if sd is not None and sd.date() < cur:
-                    continue
-
-                if years is None or len(years) == 0 or cur.year in years:
-                    events.append((cur - datetime.date.today(), prompt, ev_key, sd))
-
-            cur += datetime.timedelta(days=1)
-
+        events = _fom_get_upcoming_events(n_days)
         if len(events) == 0:
             return None
-
-        # Sorted by days until event: start date may be None for some events
-        # and can't be compared to dates of others on Python 2.
-        events.sort(key=lambda it: it[0])
         return events[0]
 
 
