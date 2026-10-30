@@ -12,6 +12,7 @@ init 190 python in fom_presence_extensions:
     from store import mas_calendar, mas_getEV
 
     import datetime
+    import time
 
 
     _fom_events_ignored = list()
@@ -74,7 +75,9 @@ init 190 python in fom_presence_extensions:
         if len(events) == 0:
             return None
 
-        events.sort(key=lambda it: it[3])
+        # Sorted by days until event: start date may be None for some events
+        # and can't be compared to dates of others on Python 2.
+        events.sort(key=lambda it: it[0])
         return events[0]
 
 
@@ -93,7 +96,7 @@ init 190 python in fom_presence_extensions:
         """
 
         # NOTE: Discord just won't render timestamps that exceed 1 hour.
-        eve = _fom_get_next_event(1, _fom_events_ignored)
+        eve = _fom_get_next_event(1)
         if eve is None:
             return None
         if eve[0].total_seconds() > 3600:
