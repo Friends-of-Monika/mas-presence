@@ -26,8 +26,11 @@ properties.
 
 The file name doesn't mean anything to submod and only helps you distinguish
 presence configs from each other; however, config files must have one of the
-following extensions: `.cfg`, `.ini` or `.conf`, files with any other extensions
-will be ignored.
+following extensions: `.cfg`, `.ini` or `.conf` (in any letter case), files with
+any other extensions will be ignored.
+
+Lines starting with `#` or `;` are comments. Comments must be on their own line:
+anything after a value, including `;` or `#`, is part of that value.
 
 ### Conditions and priorities
 
@@ -119,6 +122,24 @@ from A and have values both from A and from B.
 Only omitted values are replaced, in case some value is present in the child
 config it will never be replaced.
 
+To remove an inherited value instead, set it explicitly empty (timestamps can
+also be set to `None`). For example, this child config shows no details line, no small
+image and no start timestamp, even if its parent has them:
+
+```ini
+[Presence]
+Inherit = Default
+
+[Activity]
+Details =
+
+[Assets]
+SmallImage =
+
+[Timestamps]
+Start = None
+```
+
 ### Overriding
 
 Continuing to counter issues with default config customization, in patch 0.3.1
@@ -160,8 +181,16 @@ to edit it, you can use a path (relative to config directory) instead:
 Override = default/configs/default.conf
 ```
 
-Taking possible override conflicts into account, if there are is more than one
-override existing for a certain config, one with higher priority prevails.
+Taking possible override conflicts into account, if there is more than one
+override existing for a certain config, one with higher priority prevails, and
+the others are not used (the settings pane shows a warning about them).
+
+An overriding config can be overridden again, for example, to change a config
+pack that itself overrides default configs. Each override then works as a layer
+on top of the config it replaces: the ID and path of every config in the chain
+refer to the topmost one, and an override that also inherits from a config
+below it gets the layer directly beneath itself. If an override can't be loaded
+(e.g. it inherits from nonexistent config), the layer below it is used instead.
 
 ### Disabling
 

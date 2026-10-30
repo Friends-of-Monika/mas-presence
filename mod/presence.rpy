@@ -1,18 +1,17 @@
-# presence.rpy contains Discord Rich Presence IPC/RPC protocol implementation
-# designed specifically for the needs of Discord Presence Submod.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 # In the development and debugging phase of this Discord RPC/IPC API the
 # follow resources were used (thanks ImKventis and Discord Developers):
-# - https://github.com/ImKventis/MAS_RPC/blob/ab5209114d6165ad1c94a6d1aa75ccd695e3d1ef/game/Submods/Kventis_RPC/kventis_rpc.rpy
+# - https://archive.ph/8iw8J (ImKventis/DRPC_MAS)
 # - https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md
 # - https://discord.com/developers/docs/rich-presence/how-to
 
 init -90 python in _fom_presence_discord:
 
     # Imports
+    import store
+    from store import _fom_presence_logging as logging
 
     import platform
     import os
@@ -22,7 +21,7 @@ init -90 python in _fom_presence_discord:
     import uuid
     import errno
     import socket
-
+    import time
 
     # Constants
 
@@ -49,6 +48,14 @@ init -90 python in _fom_presence_discord:
 
     SOCK_TIMEOUT = 1
 
+    ## Handshake timeout (Discord is often slower to respond to it)
+
+    HANDSHAKE_TIMEOUT = 5
+
+    ## Interval between checks for incoming data on Windows named pipe
+
+    PIPE_POLL_INTERVAL = 0.01
+
 
     # Platform-specific approaches to IPC sockets (Unix) and pipes (Windows.)
 
@@ -73,6 +80,7 @@ init -90 python in _fom_presence_discord:
             """
 
             self._sock = socket
+            self.timeout = SOCK_TIMEOUT
 
         def write(self, data):
             """
@@ -83,7 +91,7 @@ init -90 python in _fom_presence_discord:
                     Array, list or any other iterable containing bytes to write.
             """
 
-            self._sock.settimeout(SOCK_TIMEOUT)
+            self._sock.settimeout(self.timeout)
             self._sock.sendall(data)
 
         def read(self, size):
@@ -99,7 +107,7 @@ init -90 python in _fom_presence_discord:
                     Read buffer of data (size of 0 to size.)
             """
 
-            self._sock.settimeout(SOCK_TIMEOUT)
+            self._sock.settimeout(self.timeout)
             return self._sock.recv(size)
 
         def close(self):
@@ -141,24 +149,85 @@ init -90 python in _fom_presence_discord:
 
                 try:
                     sock.connect(sock_path)
+                    logging.DEFAULT.debug("Connected to Discord IPC socket {0}.".format(sock_path))
                     return _UnixSocket(sock)
                 except socket.error as e:
                     # If socket is unhandled (somehow), connection will fail
                     # with ECONNREFUSED. Just pass this socket and try to find
                     # another one.
+                    logging.DEFAULT.debug("Could not connect to Discord IPC socket {0}: {1!r}".format(sock_path, e))
                     if e.errno != errno.ECONNREFUSED:
                         raise
 
+        logging.DEFAULT.debug("No Discord IPC socket found in {0}.".format(base_path))
         return None
 
     ## Windows named pipe
+
+    def _win_load_pipe_available():
+        """
+        Loads PeekNamedPipe function from kernel32 using ctypes and returns a
+        function that tells how many bytes can be read from a pipe without
+        blocking. Reads from Windows named pipes cannot time out otherwise.
+
+        OUT:
+            function:
+                Function accepting pipe file object and returning amount of
+                bytes available for reading, raising IOError on failure (e.g.
+                if pipe was closed by Discord.)
+
+            None:
+                None is returned if ctypes or msvcrt could not be loaded.
+        """
+
+        try:
+            import ctypes
+            import msvcrt
+            from ctypes import wintypes
+
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            peek_named_pipe = kernel32.PeekNamedPipe
+            peek_named_pipe.argtypes = (
+                wintypes.HANDLE,  # hNamedPipe
+                wintypes.LPVOID,  # lpBuffer
+                wintypes.DWORD,   # nBufferSize
+                wintypes.LPVOID,  # lpBytesRead
+                ctypes.POINTER(wintypes.DWORD),  # lpTotalBytesAvail
+                wintypes.LPVOID   # lpBytesLeftThisMessage
+            )
+            peek_named_pipe.restype = wintypes.BOOL
+
+        except (ImportError, AttributeError, OSError, ValueError) as e:
+            logging.DEFAULT.warning("Could not load PeekNamedPipe, reads from Discord pipe will not time out: {0!r}".format(e))
+            return None
+
+        logging.DEFAULT.debug("Loaded PeekNamedPipe, reads from Discord pipe will time out.")
+
+        def pipe_available(pipe):
+            available = wintypes.DWORD()
+            handle = msvcrt.get_osfhandle(pipe.fileno())
+            if not peek_named_pipe(handle, None, 0, None, ctypes.byref(available), None):
+                # WindowsError is not an IOError in Python 2, wrap it so that
+                # it is treated as protocol error.
+                code = ctypes.get_last_error()
+                raise IOError(code, ctypes.FormatError(code))
+            return available.value
+
+        return pipe_available
+
+    if platform.system() == "Windows":
+        _win_pipe_available = _win_load_pipe_available()
+    else:
+        _win_pipe_available = None
 
     class _WindowsSocket(object):
         """
         Windows implementation of Discord RPC socket using named pipe.
 
         Key differences from Unix implementation include "write" as "sendall"
-        and "read" as "recv."
+        and "read" as "recv." Reads time out after timeout seconds like Unix
+        socket reads do, unless PeekNamedPipe could not be loaded, in which
+        case reads block until data arrives.
         """
 
         def __init__(self, socket):
@@ -168,10 +237,13 @@ init -90 python in _fom_presence_discord:
 
             IN:
                 socket -> file:
-                    File object to wrap.
+                    Unbuffered file object to wrap. It must be unbuffered, or
+                    else data already read into its buffer would not be seen
+                    by PeekNamedPipe and reads would time out.
             """
 
             self._sock = socket
+            self.timeout = SOCK_TIMEOUT
 
         def write(self, data):
             """
@@ -182,7 +254,9 @@ init -90 python in _fom_presence_discord:
                     Array, list or any other iterable containing bytes to write.
             """
 
-            self._sock.write(data)
+            while data:
+                written = self._sock.write(data)
+                data = data[written:]
 
         def read(self, size):
             """
@@ -194,10 +268,50 @@ init -90 python in _fom_presence_discord:
 
             OUT:
                 bytes:
-                    Read buffer of data (size of 0 to size.)
+                    Read buffer of data (size of 0 to size, less than size only
+                    if pipe was closed.)
+
+            RAISES:
+                socket.timeout:
+                    If no data arrived in timeout seconds.
             """
 
-            return self._sock.read(size)
+            deadline = None
+            if self.timeout is not None:
+                deadline = time.time() + self.timeout
+
+            data = b""
+            while len(data) < size:
+                if _win_pipe_available is not None:
+                    self._wait_readable(deadline)
+
+                chunk = self._sock.read(size - len(data))
+                if not chunk:
+                    logging.DEFAULT.debug("Discord pipe closed while reading ({0} of {1} bytes read.)".format(len(data), size))
+                    break
+                data += chunk
+
+            return data
+
+        def _wait_readable(self, deadline):
+            """
+            Waits until there is data available for reading from the pipe.
+
+            IN:
+                deadline -> float or None:
+                    Time (as in time.time()) after which to give up waiting, or
+                    None to wait indefinitely.
+
+            RAISES:
+                socket.timeout:
+                    If no data arrived before deadline.
+            """
+
+            while _win_pipe_available(self._sock) == 0:
+                if deadline is not None and time.time() >= deadline:
+                    logging.DEFAULT.debug("No data from Discord pipe in {0}s.".format(self.timeout))
+                    raise socket.timeout("timed out")
+                time.sleep(PIPE_POLL_INTERVAL)
 
         def close(self):
             """
@@ -228,22 +342,113 @@ init -90 python in _fom_presence_discord:
             sock_path = os.path.join(base_path, "discord-ipc-{0}".format(i))
 
             try:
-                return _WindowsSocket(io.open(sock_path, "w+b"))
+                # Opened unbuffered, see _WindowsSocket constructor.
+                pipe = _WindowsSocket(io.open(sock_path, "w+b", buffering=0))
+                logging.DEFAULT.debug("Connected to Discord IPC pipe {0}.".format(sock_path))
+                return pipe
 
             except IOError as e:
                 if e.errno not in (errno.EINVAL, errno.ENOENT):
                     # Only raise if we're not trying to open closed or
                     # nonexistent pipe for reading and writing.
+                    logging.DEFAULT.debug("Could not open Discord IPC pipe {0}: {1!r}".format(sock_path, e))
                     raise
 
+        logging.DEFAULT.debug("No Discord IPC pipe found in {0}.".format(base_path))
         return None
 
     ## get_rpc_socket function definition
 
     if platform.system() == "Windows":
         get_rpc_socket = _win_get_socket
+        logging.DEFAULT.debug("Using Windows named pipe for Discord IPC.")
     else:
         get_rpc_socket = _unix_get_socket
+        logging.DEFAULT.debug("Using Unix socket for Discord IPC.")
+
+
+    # Activity text limits
+
+    # Discord rejects activity text fields (details, state, image captions)
+    # shorter or longer than this, counted in UTF-16 code units.
+    TEXT_MIN = 2
+    TEXT_MAX = 128
+
+    # Appended to text that is too short; a blank Braille pattern renders as
+    # blank, but unlike spaces is not trimmed.
+    _TEXT_PAD = u"\u2800"
+    _TEXT_ELLIPSIS = u"\u2026"
+
+    TEXT_SHORT = "short"
+    TEXT_LONG = "long"
+
+    def _text_units(c):
+        # Characters outside of BMP take two UTF-16 code units; on narrow
+        # Python builds they are already two (surrogate) characters.
+        return 2 if ord(c) > 0xFFFF else 1
+
+    def text_length(text):
+        """
+        Returns length of text as Discord counts it (in UTF-16 code units.)
+
+        IN:
+            text -> unicode:
+                Text to measure.
+
+        OUT:
+            int:
+                Length of text.
+        """
+
+        return sum(_text_units(c) for c in text)
+
+    def fit_text(text):
+        """
+        Fits text into Discord limits for activity text fields: whitespace is
+        trimmed, empty text is omitted, too short text is padded with a blank
+        character and too long text is shortened with an ellipsis.
+
+        IN:
+            text -> str or None:
+                Text to fit.
+
+        OUT:
+            tuple of (text, problem):
+                text -> unicode or None:
+                    Fitted text, or None if text should be omitted.
+
+                problem -> str or None:
+                    TEXT_SHORT or TEXT_LONG if text had to be changed,
+                    None otherwise.
+        """
+
+        if text is None:
+            return None, None
+        if isinstance(text, bytes):
+            text = text.decode("utf-8", "replace")
+
+        text = text.strip()
+        if not text:
+            return None, None
+
+        length = text_length(text)
+        if length < TEXT_MIN:
+            return text + _TEXT_PAD * (TEXT_MIN - length), TEXT_SHORT
+        if length <= TEXT_MAX:
+            return text, None
+
+        limit = TEXT_MAX - text_length(_TEXT_ELLIPSIS)
+        chars, used = [], 0
+        for c in text:
+            used += _text_units(c)
+            if used > limit:
+                break
+            chars.append(c)
+
+        # Do not leave half of a surrogate pair behind on narrow builds.
+        if chars and 0xD800 <= ord(chars[-1]) <= 0xDBFF:
+            chars.pop()
+        return u"".join(chars).rstrip() + _TEXT_ELLIPSIS, TEXT_LONG
 
 
     # User activity wrapper class definitions
@@ -460,7 +665,9 @@ init -90 python in _fom_presence_discord:
             op, dl = struct.unpack("<II", reader.read(8))
 
             # Read remaining data, decode as UTF-8 and parse JSON.
-            dd = json.loads(reader.read(dl).decode("utf-8"))
+            dd = None
+            if dl > 0:
+                dd = json.loads(reader.read(dl).decode("utf-8"))
 
             # Return packet with unpacked data.
             return Packet(op, dd)
@@ -521,18 +728,6 @@ init -90 python in _fom_presence_discord:
                 v=1, client_id=str(client_id)
             ))
 
-    class Ping(Packet):
-        """
-        Ping is the packet sent to RPC socket to ensure it is still operational.
-        """
-
-        def __init__(self):
-            """
-            Creates a new instance of Ping packet.
-            """
-
-            super(Ping, self).__init__(OP_PING, dict(msg="pong"))
-
     class Command(Packet):
         """
         Command is the packet sent to RPC socket to invoke a command and get a
@@ -592,11 +787,6 @@ init -90 python in _fom_presence_discord:
                 pid=os.getpid()
             ))
 
-
-    ## Pre-initialized packets that can be reused without any changes.
-
-    PACK_PING = Packet(OP_PING, dict(msg="pong"))
-
     ## Packet-wrapping error
 
     class CallError(Exception):
@@ -644,6 +834,9 @@ init -90 python in _fom_presence_discord:
                     None is returned when provided packet wasn't containing an
                     error response.
             """
+
+            if packet.payload is None:
+                return None
 
             if (
                 packet.opcode == OP_CLOSE
@@ -716,15 +909,23 @@ init -90 python in _fom_presence_discord:
 
             self._sock = socket
 
-        def call(self, packet):
+        def call(self, packet, timeout=None):
             """
             Sends a packet and receives response. If response was an error
             response, a CallError is raised, otherwise the response is returned
             as packet instance.
 
+            While waiting for the response, pings sent by Discord are answered
+            and packets not related to this call (e.g. late responses to
+            earlier calls) are skipped.
+
             IN:
                 packet -> Packet:
                     Packet to send.
+
+                timeout -> float or None, default None:
+                    Timeout of each read and write in seconds. If None,
+                    SOCK_TIMEOUT is used.
 
             OUT:
                 Packet:
@@ -733,19 +934,77 @@ init -90 python in _fom_presence_discord:
             RAISES:
                 CallError:
                     CallError is raised when response received was erroneous.
+
+                ProtocolError:
+                    ProtocolError is raised when communication failed or timed
+                    out.
             """
 
+            if timeout is None:
+                timeout = SOCK_TIMEOUT
+            self._sock.timeout = timeout
+
+            nonce = None
+            if packet.payload is not None:
+                nonce = packet.payload.get("nonce")
+
+            started_at = time.time()
             try:
                 packet.dump(self._sock)
-                rp = Packet.load(self._sock)
+                while True:
+                    rp = Packet.load(self._sock)
+                    if self._is_response(rp, nonce):
+                        break
             except (struct.error, IOError) as e:
+                logging.DEFAULT.debug("Call {0!r} failed after {1:.3f}s: {2!r}".format(packet, time.time() - started_at, e))
                 raise ProtocolError(e)
+
+            if logging.TRACE:
+                logging.DEFAULT.debug("Call {0!r} returned {1!r} in {2:.3f}s.".format(packet, rp, time.time() - started_at))
 
             err = CallError.from_packet(rp)
             if err is not None:
                 raise err
 
             return rp
+
+        def _is_response(self, packet, nonce):
+            """
+            Checks if the received packet is a response to the call with the
+            provided nonce, answering it if it is a ping from Discord.
+
+            IN:
+                packet -> Packet:
+                    Received packet.
+
+                nonce -> str or None:
+                    Nonce of the call waiting for response, or None if call
+                    has no nonce (e.g. handshake.)
+
+            OUT:
+                bool:
+                    True if packet is the response, False if it should be
+                    skipped.
+            """
+
+            if packet.opcode == OP_PING:
+                logging.DEFAULT.debug("Answering ping from Discord.")
+                Packet(OP_PONG, packet.payload).dump(self._sock)
+                return False
+
+            if packet.opcode == OP_PONG:
+                return False
+
+            if (
+                nonce is not None
+                and packet.opcode == OP_DISPATCH
+                and packet.payload is not None
+                and packet.payload.get("nonce") not in (None, nonce)
+            ):
+                logging.DEFAULT.debug("Skipping unrelated packet {0!r}.".format(packet))
+                return False
+
+            return True
 
         def handshake(self, client_id):
             """
@@ -765,7 +1024,7 @@ init -90 python in _fom_presence_discord:
                     If client ID is invalid, unauthorized or nonexistent.
             """
 
-            res_p = self.call(Identify(client_id))
+            res_p = self.call(Identify(client_id), timeout=HANDSHAKE_TIMEOUT)
             return res_p.payload["data"]
 
         def command(self, command, args):
@@ -811,17 +1070,6 @@ init -90 python in _fom_presence_discord:
                     If error occurs.
             """
             self.call(ClearActivity())
-
-        def ping(self):
-            """
-            A convenience method for sending ping packet.
-
-            RAISES:
-                ProtocolError:
-                    If socket is not longer responsible.
-            """
-
-            self.call(Ping())
 
         def disconnect(self):
             """

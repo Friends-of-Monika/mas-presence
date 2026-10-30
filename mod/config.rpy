@@ -1,57 +1,43 @@
-# config.rpy contains classes and functions for working with presence config
-# files as well as stores persistent variables affecting the behavior of
-# Discord Presence Submod.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
+# https://github.com/friends-of-monika/mas-presence
 
 default persistent._fom_presence_enabled = True
 
-
 init 90 python in _fom_presence_config:
-
     import store
 
     from store import persistent
     from store import _fom_presence as mod
     from store import _fom_presence_util as util
     from store import _fom_presence_discord as discord
-    from store import _fom_presence_error as error
+    from store import _fom_presence_status as status
     from store import _fom_presence_logging as logging
 
     import sys
     import os
+    import io
     import time
+    import traceback
 
     if sys.version_info.major == 2:
         import ConfigParser as configparser
-        import io
     else:
         import configparser
 
 
-    # Errors and warnings
+    # Problems shown in settings pane (see status.rpy)
 
-    _ERROR_CONFIG_LOADING = error.Error(
-        log_message_report="Could not load presence config from file {0}: {1}.",
-        ui_message_report="Could not load some presence configs, see log/submod_log.log."
-    )
+    _STATUS_CONFIG_PREFIX = "config:"
 
-    _ERROR_CONFIG_INHERITANCE = error.Error(
-        log_message_report="Presence config {0} inherits nonexistent config ID: {1}.",
-        ui_message_report="Could not load some presence configs, see log/submod_log.log."
-    )
+    # Text of the activity being built does not fit Discord limits; only the
+    # most recently built activity matters, so there is a single entry.
+    _STATUS_TEXT = _STATUS_CONFIG_PREFIX + "text"
 
-    _ERROR_CONFIG_OVERRIDE = error.Error(
-        log_message_report="Presence config {0} overrides nonexistent config ID: {1}.",
-        ui_message_report="Could not load some presence configs, see log/submod_log.log."
-    )
-
-    _WARNING_CONFIG_CLASH = error.Error(
-        log_message_report="Config from file {0} has conflicting name with some other config: {1}.",
-        ui_message_report="There were some warnings during loading some of the presence configs, see log/submod_log.log.",
-        warning=True
-    )
+    def _report_config_problem(kind, rel_file, ui_message, log_message, level=status.ERROR):
+        status.set(
+            util.format_text("{0}{1}:{2}", _STATUS_CONFIG_PREFIX, kind, rel_file),
+            ui_message, log_message, level
+        )
 
 
     # Timestamps and related functions and variables
@@ -137,27 +123,110 @@ init 90 python in _fom_presence_config:
 
     # ConfigParser wrapper and related functions and classes
 
+    # Marker for values omitted in config file, as opposed to values set
+    # explicitly empty (or to None for timestamps), so that only omitted values
+    # are inherited. Replaced with defaults once inheritance is applied.
+    _UNSET = object()
+
+    def _parse_text(s):
+        """
+        Parses activity text: empty value means no text, anything else is a
+        string to perform substitution on whenever activity is built.
+
+        IN:
+            s -> str:
+                Text to parse.
+
+        OUT:
+            Supplier:
+                Supplier of substituted text, or util.SUPPLY_NONE for empty
+                value.
+        """
+
+        if not s.strip():
+            return util.SUPPLY_NONE
+        return util.supply_subsitute(s)
+
+    def _parse_image(s):
+        """
+        Parses image asset key or URL: empty value means no image.
+
+        IN:
+            s -> str:
+                Image key or URL to parse.
+
+        OUT:
+            str:
+                Image key or URL.
+
+            None:
+                For empty value.
+        """
+
+        s = s.strip()
+        if not s:
+            return None
+        return s
+
     def _parse_bool(s):
         """
         Parses a string and returns a boolean value for its content.
-        Values "true", "yes", "y" (case-insensitive) will be considered True,
-        anything else will be False.
+        Values "true", "yes", "y", "1" (case-insensitive) are considered True,
+        values "false", "no", "n", "0" are considered False.
 
         IN:
             s -> str:
                 String to parse boolean from.
 
         OUT:
-            True:
-                For strings "true", "yes", "y" (case-insensitive.)
+            bool:
+                Parsed value.
 
-            False:
-                For any other strings.
+        RAISES:
+            ValueError:
+                If value is neither of the above.
         """
 
-        if s.lower() in ("true", "yes", "y"):
+        s = s.strip().lower()
+        if s in ("true", "yes", "y", "1"):
             return True
-        return False
+        if s in ("false", "no", "n", "0"):
+            return False
+        raise ValueError("expected True or False")
+
+    def _parse_int(s):
+        """
+        Parses an integer value (e.g. priority or application ID.)
+
+        RAISES:
+            ValueError:
+                If value is not a whole number.
+        """
+
+        try:
+            return int(s.strip())
+        except (ValueError, UnicodeError):
+            raise ValueError("expected a whole number")
+
+    def _parse_str(s):
+        """
+        Parses a plain string value (e.g. config ID), stripping whitespace.
+        Unlike str(), keeps non-ASCII characters intact.
+        """
+
+        return s.strip()
+
+    # Stands in for semicolons while config is parsed, see Config.from_file.
+    _SEMICOLON = u"\ue000"
+
+    # Known sections and keys (lowercase, as ConfigParser lowercases keys.)
+    _SCHEMA = {
+        "Presence": ("condition", "priority", "dynamic", "id", "inherit", "override", "disable"),
+        "Client": ("applicationid",),
+        "Activity": ("details", "state"),
+        "Assets": ("largeimage", "largetext", "smallimage", "smalltext"),
+        "Timestamps": ("start", "end")
+    }
 
     if sys.version_info.major == 2:
         def _open_with_encoding(path, mode, encoding="utf-8"):
@@ -179,7 +248,7 @@ init 90 python in _fom_presence_config:
                     File opened in the provided mode with provided encoding.
             """
 
-            return io.open(path, mode, encoding="utf-8")
+            return io.open(path, mode, encoding=encoding)
     else:
         def _open_with_encoding(path, mode, encoding="utf-8"):
             """
@@ -200,7 +269,7 @@ init 90 python in _fom_presence_config:
                     File opened in the provided mode with provided encoding.
             """
 
-            return open(path, mode, encoding="utf-8")
+            return open(path, mode, encoding=encoding)
 
     class _ParserWrapper(object):
         """
@@ -240,9 +309,42 @@ init 90 python in _fom_presence_config:
             """
 
             try:
-                return deserializer(self._parser.get(section, value, raw=True))
-            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                raw = self._parser.get(section, value, raw=True).replace(_SEMICOLON, u";")
+            except (configparser.NoOptionError, configparser.NoSectionError):
                 return default
+
+            try:
+                return deserializer(raw)
+            except Exception as e:
+                raise ValueError(util.format_text(u"invalid value of {0} in [{1}]: \"{2}\" ({3})", value, section, raw.strip(), e))
+
+        def find_unknown(self):
+            """
+            Finds sections and keys not used by configs (e.g. misspelt ones.)
+
+            OUT:
+                list of str:
+                    Descriptions of unknown sections and keys.
+            """
+
+            problems = []
+            lower_sections = dict((name.lower(), name) for name in _SCHEMA)
+            defaults = set(self._parser.defaults())
+
+            for section in self._parser.sections():
+                if section not in _SCHEMA:
+                    known = lower_sections.get(section.lower())
+                    if known is not None:
+                        problems.append(u"section [{0}] is ignored, did you mean [{1}]? (section names are case-sensitive)".format(section, known))
+                    else:
+                        problems.append(u"unknown section [{0}] is ignored".format(section))
+                    continue
+
+                for key in self._parser.options(section):
+                    if key not in defaults and key not in _SCHEMA[section]:
+                        problems.append(u"unknown key {0} in [{1}] is ignored".format(key.replace(_SEMICOLON, u";"), section))
+
+            return problems
 
 
     # Config object and related functions and variables
@@ -263,37 +365,71 @@ init 90 python in _fom_presence_config:
                     ParserWrapper that will load values from ConfigParser.
             """
 
+            # Condition is compiled once here (which also catches syntax
+            # errors early), and only the code object is evaluated afterwards.
             condition = parser.get_value("Presence", "Condition")
+            condition_code = None
             if condition is not None:
                 condition = condition.strip()
                 if len(condition) > 0:
-                    compile(condition, "<string>", "eval")
+                    try:
+                        condition_code = compile(condition, "<string>", "eval")
+                    except SyntaxError as e:
+                        raise ValueError(util.format_text("invalid Condition in [Presence]: {0}", e))
                 else:
                     condition = None
             self.condition = condition
+            self.condition_code = condition_code
 
-            self.priority = parser.get_value("Presence", "Priority", int, 0)
+            self.priority = parser.get_value("Presence", "Priority", _parse_int, 0)
             self.dynamic = parser.get_value("Presence", "Dynamic", _parse_bool, True)
-            self.id = parser.get_value("Presence", "ID", str, None)
-            self.inherit_id = parser.get_value("Presence", "Inherit", str, None)
-            self.override_id = parser.get_value("Presence", "Override", str, None)
+            self.id = parser.get_value("Presence", "ID", _parse_str, None)
+            self.inherit_id = parser.get_value("Presence", "Inherit", _parse_str, None)
+            self.override_id = parser.get_value("Presence", "Override", _parse_str, None)
             self.disable = parser.get_value("Presence", "Disable", _parse_bool, False)
 
-            self.app_id = parser.get_value("Client", "ApplicationID", int)
+            # Inheritable values are _UNSET if omitted, see finalize().
+            self.app_id = parser.get_value("Client", "ApplicationID", _parse_int, _UNSET)
 
-            self.details = parser.get_value("Activity", "Details", util.supply_subsitute, util.SUPPLY_NONE)
-            self.state = parser.get_value("Activity", "State", util.supply_subsitute, util.SUPPLY_NONE)
+            self.details = parser.get_value("Activity", "Details", _parse_text, _UNSET)
+            self.state = parser.get_value("Activity", "State", _parse_text, _UNSET)
 
-            self.large_image = parser.get_value("Assets", "LargeImage")
-            self.large_text = parser.get_value("Assets", "LargeText", util.supply_subsitute, util.SUPPLY_NONE)
-            self.small_image = parser.get_value("Assets", "SmallImage")
-            self.small_text = parser.get_value("Assets", "SmallText", util.supply_subsitute, util.SUPPLY_NONE)
+            self.large_image = parser.get_value("Assets", "LargeImage", _parse_image, _UNSET)
+            self.large_text = parser.get_value("Assets", "LargeText", _parse_text, _UNSET)
+            self.small_image = parser.get_value("Assets", "SmallImage", _parse_image, _UNSET)
+            self.small_text = parser.get_value("Assets", "SmallText", _parse_text, _UNSET)
 
-            self.start_ts = parser.get_value("Timestamps", "Start", _parse_ts_supplier, util.SUPPLY_NONE)
-            self.stop_ts = parser.get_value("Timestamps", "End", _parse_ts_supplier, util.SUPPLY_NONE)
+            # Problems that do not prevent this config from being used, but
+            # likely indicate a mistake (e.g. misspelt keys.)
+            self.warnings = parser.find_unknown()
+
+            self.start_ts = self._get_timestamp(parser, "Start")
+            self.stop_ts = self._get_timestamp(parser, "End")
 
             self._activity = None
+            self._text_problems = []
             self._file = None
+
+        def _get_timestamp(self, parser, key):
+            """
+            Reads timestamp supplier, adding a warning for unknown supplier
+            names (in which case no timestamp is shown.)
+            """
+
+            name = parser.get_value("Timestamps", key, _parse_str, _UNSET)
+            if name is _UNSET:
+                return _UNSET
+            if not name:
+                # Empty value clears timestamp, same as None.
+                return util.SUPPLY_NONE
+
+            supplier = _parse_ts_supplier(name)
+            if supplier is None:
+                self.warnings.append(u"unknown timestamp {0} = {1} is ignored (known: {2})".format(
+                    key, name, ", ".join(sorted(timestamps_db))
+                ))
+                return util.SUPPLY_NONE
+            return supplier
 
         @staticmethod
         def from_file(path):
@@ -309,9 +445,24 @@ init 90 python in _fom_presence_config:
                     Config loaded from file.
             """
 
-            c = configparser.ConfigParser()
             with _open_with_encoding(path, "r", encoding="utf-8") as f:
-                c.readfp(f, path.replace("\\", "/").split("/")[:-1])
+                text = f.read()
+
+            # Editors such as Windows Notepad may save files with a UTF-8 BOM,
+            # which ConfigParser would take for part of the first line.
+            if text.startswith(u"\ufeff"):
+                text = text[1:]
+
+            # Python 2 ConfigParser cuts values at " ;" (inline comment) with
+            # no way to turn it off, so semicolons outside of comment lines
+            # are hidden from it and restored in _ParserWrapper.get_value.
+            text = u"".join(
+                line if line.startswith((u"#", u";", u"[")) else line.replace(u";", _SEMICOLON)
+                for line in text.splitlines(True)
+            )
+
+            c = configparser.ConfigParser()
+            c.readfp(io.StringIO(text), path.replace("\\", "/"))
 
             config = Config(_ParserWrapper(c))
             config._file = path
@@ -329,34 +480,41 @@ init 90 python in _fom_presence_config:
 
             return self._file
 
+        # Values copied from parent config if omitted, with their defaults.
+        _INHERITABLE = (
+            ("app_id", None),
+            ("details", util.SUPPLY_NONE),
+            ("state", util.SUPPLY_NONE),
+            ("large_image", None),
+            ("large_text", util.SUPPLY_NONE),
+            ("small_image", None),
+            ("small_text", util.SUPPLY_NONE),
+            ("start_ts", util.SUPPLY_NONE),
+            ("stop_ts", util.SUPPLY_NONE)
+        )
+
         def copy_from(self, config):
             """
-            Copies values from another config (only omitted, None or
-            util.SUPPLY_NONE values) over to this config.
+            Copies values omitted in this config from another config. Values
+            set explicitly (including empty ones) are kept.
 
             IN:
                 config -> Config:
                     Config to copy values from.
             """
 
-            if self.app_id is None:
-                self.app_id = config.app_id
-            if self.details is util.SUPPLY_NONE:
-                self.details = config.details
-            if self.state is util.SUPPLY_NONE:
-                self.state = config.state
-            if self.large_image is None:
-                self.large_image = config.large_image
-            if self.large_text is util.SUPPLY_NONE:
-                self.large_text = config.large_text
-            if self.small_image is None:
-                self.small_image = config.small_image
-            if self.small_text is util.SUPPLY_NONE:
-                self.small_text = config.small_text
-            if self.start_ts is util.SUPPLY_NONE:
-                self.start_ts = config.start_ts
-            if self.stop_ts is util.SUPPLY_NONE:
-                self.stop_ts = config.stop_ts
+            for name, _ in Config._INHERITABLE:
+                if getattr(self, name) is _UNSET:
+                    setattr(self, name, getattr(config, name))
+
+        def finalize(self):
+            """
+            Replaces values still omitted after inheritance with defaults.
+            """
+
+            for name, default in Config._INHERITABLE:
+                if getattr(self, name) is _UNSET:
+                    setattr(self, name, default)
 
         def to_activity(self):
             """
@@ -365,158 +523,411 @@ init 90 python in _fom_presence_config:
             stored in _activity and then retrieved from it on next call, not
             re-evaluating suppliers and not building fresh Activity.
 
+            NOTE:
+                Text that does not fit Discord limits is padded or shortened,
+                which is reported to status module (and cleared once text of
+                activity being built fits again.)
+
             OUT:
                 Activity:
                     Activity based on properties this Config instance has.
             """
 
-            if self._activity is not None:
-                return self._activity
+            a = self._activity
+            if a is None:
+                a = self._build_activity()
+                if not self.dynamic:
+                    self._activity = a
+
+            if self._text_problems:
+                status.set(
+                    _STATUS_TEXT,
+                    util.format_text("Config {0} has text that was shortened or padded, see log/submod_log.log.", self.file),
+                    util.format_text(
+                        "Presence config {0} has text Discord can't show as is: {1}.",
+                        self.file, "; ".join(self._text_problems)
+                    ),
+                    status.WARNING
+                )
+            else:
+                status.clear(_STATUS_TEXT)
+            return a
+
+        def _build_activity(self):
+            problems = []
+
+            def text(key, supplier):
+                value, problem = discord.fit_text(supplier.get())
+                if problem == discord.TEXT_SHORT:
+                    problems.append(u"{0} is shorter than {1} characters and was padded".format(key, discord.TEXT_MIN))
+                elif problem == discord.TEXT_LONG:
+                    problems.append(u"{0} is longer than {1} characters and was shortened".format(key, discord.TEXT_MAX))
+                return value
+
             a = discord.Activity()
+            a.state = text("State", self.state)
+            a.details = text("Details", self.details)
 
-            if self.state is not None:
-                a.state = self.state.get()
-            if self.details is not None:
-                a.details = self.details.get()
-
-            if self.start_ts is not None:
-                a.timestamps.start = self.start_ts.get()
-            if self.stop_ts is not None:
-                a.timestamps.end = self.stop_ts.get()
+            a.timestamps.start = self.start_ts.get()
+            a.timestamps.end = self.stop_ts.get()
 
             if self.large_image is not None:
                 a.assets.large_image = self.large_image
-                if self.large_text is not None:
-                    a.assets.large_text = self.large_text.get()
+                a.assets.large_text = text("LargeText", self.large_text)
             if self.small_image is not None:
                 a.assets.small_image = self.small_image
-                if self.small_text is not None:
-                    a.assets.small_text = self.small_text.get()
+                a.assets.small_text = text("SmallText", self.small_text)
 
-            if not self.dynamic:
-                self._activity = a
+            self._text_problems = problems
             return a
+
+
+    def _eval_condition(code):
+        """
+        Evaluates compiled config condition in global Ren'Py scope.
+
+        IN:
+            code -> code:
+                Compiled condition, see Config.condition_code.
+
+        OUT:
+            any:
+                Result of the condition.
+        """
+
+        # Store is passed as globals (not locals) so that nested scopes such
+        # as generator expressions and lambdas can see store variables too.
+        return eval(code, store.__dict__)
 
 
     _config_dir = os.path.join(mod.basedir, "config")
     _configs = list()
     _config_id_map = dict()
+    _config_path_map = dict()
 
     def reload_configs():
         """
         Clears global _configs variable and populates it with new valid configs.
+        If reloading fails unexpectedly, previously loaded configs are kept.
 
         NOTE:
-            All errors will be reported using Error objects in global current
-            error context. Reported errors are not resolved on successful loads.
+            Problems are reported to status module; problems reported on
+            previous loads are cleared.
+        """
+
+        status.clear_prefix(_STATUS_CONFIG_PREFIX)
+
+        try:
+            configs, ids, paths = _load_configs()
+        except Exception:
+            logging.DEFAULT.error("Could not reload presence configs:\n{0}".format(traceback.format_exc()))
+            status.set(
+                _STATUS_CONFIG_PREFIX + "reload",
+                "Could not reload configs, see log/submod_log.log."
+            )
+            return
+
+        # Re-populate config list, sorted on reload to save precious time on
+        # every loop (and by path too, so that ties are resolved the same way
+        # every time.)
+        del _configs[:]
+        _configs.extend(sorted(configs.items(), key=lambda it: _load_order(it[1])))
+
+        # Re-populate ID and path maps.
+        _config_id_map.clear()
+        _config_id_map.update(ids)
+        _config_path_map.clear()
+        _config_path_map.update(paths)
+
+    def _normalize_ref(ref):
+        """
+        Normalizes config reference (ID or path relative to config directory)
+        so that paths always use "/" as folder separator.
+
+        IN:
+            ref -> str:
+                Reference to normalize.
+
+        OUT:
+            str:
+                Normalized reference.
+        """
+
+        ref = ref.strip().replace("\\", "/")
+        while ref.startswith("./"):
+            ref = ref[2:]
+        return ref.lstrip("/")
+
+    def _lookup(ref, ids, paths):
+        """
+        Looks up config by reference, trying it as an ID first and as a path
+        (relative to config directory) second.
+
+        IN:
+            ref -> str or None:
+                Config ID or path.
+
+            ids -> dict:
+                Map of config ID to Config instance.
+
+            paths -> dict:
+                Map of config path to Config instance.
+
+        OUT:
+            Config:
+                If config was found.
+
+            None:
+                If no config matches reference.
+        """
+
+        if ref is None:
+            return None
+        ref = _normalize_ref(ref)
+        config = ids.get(ref)
+        if config is None:
+            config = paths.get(ref)
+        return config
+
+    def _load_order(config):
+        """
+        Sort key that orders configs by priority (highest first) and then by
+        path, so that order is the same on every load and every platform.
+        """
+
+        return (-config.priority, config.file)
+
+    def _load_configs():
+        """
+        Loads configs from config directory and applies overrides and
+        inheritance.
+
+        OUT:
+            tuple of (configs, ids, paths):
+                configs -> dict:
+                    Map of config path (relative to config directory, with
+                    "/" separators) to Config instance.
+
+                ids -> dict:
+                    Map of config ID to Config instance.
+
+                paths -> dict:
+                    Map of config path to Config instance.
         """
 
         configs = dict()
-        id_map = dict()
-
-        inherit_list = list()
-        override_map = dict()
 
         for _dir, _, files in os.walk(_config_dir):
             for _file in files:
-                if not (
-                    _file.endswith(".ini") or
-                    _file.endswith(".cfg") or
-                    _file.endswith(".conf")
-                ):
+                if not _file.lower().endswith((".ini", ".cfg", ".conf")):
                     continue
 
                 _file = os.path.join(_dir, _file)
-                rel_file = _file[len(_config_dir) + 1:]
+                rel_file = os.path.relpath(_file, _config_dir).replace(os.sep, "/")
 
                 try:
                     config = Config.from_file(_file)
-                    if config.condition is not None:
-                        eval(config.condition, dict(), store.__dict__)
+                    if config.condition_code is not None:
+                        _eval_condition(config.condition_code)
                     config._file = rel_file
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(rel_file, e)
+                    _report_config_problem(
+                        "loading", rel_file,
+                        util.format_text("Could not load config {0}, see log/submod_log.log.", rel_file),
+                        util.format_text("Could not load presence config from file {0}: {1}.", rel_file, e)
+                    )
                     continue
 
-                # Save config to config map by its path as map key.
                 configs[rel_file] = config
-                if config.id is not None:
-                    ov = id_map.get(config.id)
-                    if ov is not None:
-                        _WARNING_CONFIG_CLASH.report(rel_file, config.id)
 
-                # Build inheritance list (configs to perform inheritance on.)
-                if config.inherit_id is not None:
-                    inherit_list.append(config)
+        # Build path and ID maps. When several configs share an ID, the one
+        # with the highest priority (then the first by path) gets it.
+        paths = dict(configs)
+        ids = dict()
+        for config in sorted(configs.values(), key=_load_order):
+            if config.id is None:
+                continue
 
-                # Build override map (ID of config to override to list of configs
-                # willing to override.)
-                if config.override_id is not None:
-                    if config.override_id not in override_map:
-                        override_map[config.override_id] = [config]
-                    else:
-                        override_map[config.override_id].append(config)
+            owner = ids.get(config.id)
+            if owner is None:
+                ids[config.id] = config
+                continue
 
-                # Populate ID map with desired ID and path.
-                id_map[config.id] = config
-                id_map[rel_file] = config
+            _report_config_problem(
+                "clash", config.file,
+                util.format_text("Config {0} has ID {1} already used by config {2}.", config.file, config.id, owner.file),
+                util.format_text("Presence config {0} has ID {1} already used by config {2} (which takes precedence.)", config.file, config.id, owner.file),
+                status.WARNING
+            )
+
+        # Build override chains: each config overridden by a config (the one
+        # with the highest priority, then the first by path, if there are
+        # several) is a layer below it; references are resolved first so that
+        # the same config referenced by ID and by path is treated as one.
+        candidates = dict()
+        for config in sorted(configs.values(), key=_load_order):
+            if config.override_id is None:
+                continue
+
+            target = _lookup(config.override_id, ids, paths)
+            if target is None or target is config:
+                _report_config_problem(
+                    "override", config.file,
+                    util.format_text("Config {0} overrides unknown config ID {1}.", config.file, config.override_id),
+                    util.format_text("Presence config {0} overrides nonexistent config ID: {1}.", config.file, config.override_id)
+                )
+                continue
+
+            candidates.setdefault(target, []).append(config)
+
+        failed = set()
+
+        above = dict()
+        for target, overrides in candidates.items():
+            above[target] = overrides[0]
+            for loser in overrides[1:]:
+                failed.add(loser)
+                _report_config_problem(
+                    "override", loser.file,
+                    util.format_text("Config {0} is not used, config {1} overrides the same config.", loser.file, overrides[0].file),
+                    util.format_text("Presence config {0} is not used: it overrides config {1}, but so does config {2} which takes precedence.", loser.file, target.file, overrides[0].file),
+                    status.WARNING
+                )
+
+        # Configs overriding each other in a loop can't be used.
+        cycles = []
+        in_cycle = set()
+        for target in sorted(above, key=lambda it: it.file):
+            seen = []
+            config = target
+            while config in above and config not in seen:
+                seen.append(config)
+                config = above[config]
+            if config in seen and config not in in_cycle:
+                cycle = seen[seen.index(config):]
+                in_cycle.update(cycle)
+                cycles.append(cycle)
+
+        for cycle in cycles:
+            cycle_str = u" -> ".join(util.to_text(it.file) for it in cycle + cycle[:1])
+            for member in cycle:
+                failed.add(member)
+                _report_config_problem(
+                    "override", member.file,
+                    util.format_text("Config {0} is part of override cycle, see log/submod_log.log.", member.file),
+                    util.format_text("Presence config {0} is part of override cycle: {1}.", member.file, cycle_str)
+                )
+        for cycle in cycles:
+            for member in cycle:
+                above.pop(member, None)
+
+        def layers(config):
+            # Config and the configs overriding it, bottom to top.
+            result = [config]
+            while result[-1] in above:
+                result.append(above[result[-1]])
+            return result
 
         inherited = set()
 
-        def inherit(config):
+        def report_inheritance(config, ui_message, log_message):
+            failed.add(config)
+            _report_config_problem("inheritance", config.file, ui_message, log_message)
+
+        def resolve(config, viewer, chain):
+            # Returns the config that takes place of the provided one: the
+            # topmost layer that could be loaded, or, for a layer of the same
+            # chain, the nearest layer below it. Returns None if none could be
+            # loaded.
+            stack = layers(config)
+            if viewer in stack:
+                stack = stack[:stack.index(viewer)]
+            for layer in reversed(stack):
+                if inherit(layer, chain):
+                    return layer
+            return None
+
+        def inherit(config, chain):
             if config in inherited:
                 return True
+            if config in failed:
+                return False
+
+            if config in chain:
+                cycle = chain[chain.index(config):] + [config]
+                cycle_str = u" -> ".join(util.to_text(it.file) for it in cycle)
+                for member in cycle[:-1]:
+                    report_inheritance(
+                        member,
+                        util.format_text("Config {0} is part of inheritance cycle, see log/submod_log.log.", member.file),
+                        util.format_text("Presence config {0} is part of inheritance cycle: {1}.", member.file, cycle_str)
+                    )
+                return False
 
             if config.inherit_id is not None:
-                parent = id_map.get(config.inherit_id)
-                if parent is None:
-                    _ERROR_CONFIG_INHERITANCE.report(rel_file, config.id)
+                ref = _lookup(config.inherit_id, ids, paths)
+                if ref is None:
+                    report_inheritance(
+                        config,
+                        util.format_text("Config {0} inherits unknown config ID {1}.", config.file, config.inherit_id),
+                        util.format_text("Presence config {0} inherits nonexistent config ID: {1}.", config.file, config.inherit_id)
+                    )
                     return False
 
-                if not inherit(parent):
+                parent = resolve(ref, config, chain + [config])
+                if parent is None:
+                    if config not in failed:
+                        report_inheritance(
+                            config,
+                            util.format_text("Config {0} inherits from config {1} that could not be loaded.", config.file, ref.file),
+                            util.format_text("Presence config {0} inherits from config {1} that could not be loaded.", config.file, ref.file)
+                        )
                     return False
+
                 config.copy_from(parent)
 
             inherited.add(config)
             return True
 
-        def remove(config):
-            del configs[config.file]
-            del id_map[config.file]
-            if config.id is not None:
-                del id_map[config.id]
+        # Every ID and path now refers to the config that takes place of the
+        # config it belonged to; configs nothing refers to are not used.
+        final = dict()
+        for config in sorted(configs.values(), key=_load_order):
+            final[config] = resolve(config, None, [])
 
-        # Apply overrides.
-        for _id, overrides in override_map.items():
-            target = id_map.get(_id)
-            if target is None:
-                _ERROR_CONFIG_OVERRIDE.report(overrides[0].file, _id)
+        final_ids = dict((_id, final[config]) for _id, config in ids.items() if final[config] is not None)
+        final_paths = dict((path, final[config]) for path, config in paths.items() if final[config] is not None)
+        final_configs = dict((config.file, config) for config in set(final_paths.values()))
+
+        def remove(config):
+            final_configs.pop(config.file, None)
+            for refs in (final_ids, final_paths):
+                for ref in [ref for ref, it in refs.items() if it is config]:
+                    del refs[ref]
+
+        for config in list(final_configs.values()):
+            config.finalize()
+
+            # Configs that can be chosen must end up with an application ID;
+            # others may be just bases for inheritance.
+            if config.app_id is None and config.condition_code is not None and not config.disable:
+                _report_config_problem(
+                    "invalid", config.file,
+                    util.format_text("Config {0} can't be used, see log/submod_log.log.", config.file),
+                    util.format_text("Presence config {0} has no ApplicationID (neither set in [Client] nor inherited), so it can't be used.", config.file)
+                )
+                remove(config)
                 continue
 
-            overrides.sort(key=lambda it: it.priority, reverse=True)
-            for rem_conf in (overrides[1:] + [target]):
-                remove(rem_conf)
+            if config.warnings:
+                _report_config_problem(
+                    "warnings", config.file,
+                    util.format_text("Config {0} has warnings, see log/submod_log.log.", config.file),
+                    util.format_text("Presence config {0} has warnings: {1}.", config.file, "; ".join(config.warnings)),
+                    status.WARNING
+                )
 
-            override = overrides[0]
-            override.id = _id
-            id_map[_id] = override
-
-        # Apply inheritance.
-        while len(inherit_list) > 0:
-            config = inherit_list.pop()
-            if not inherit(config):
-                remove(config)
-
-        # Re-populate config list with config list used locally.
-        del _configs[:]
-        _configs.extend(list(configs.items()))
-
-        # Sort configs on reload to save precious time on every loop.
-        _configs.sort(key=lambda it: it[1].priority, reverse=True)
-
-        # Re-populate ID map.
-        _config_id_map.clear()
-        _config_id_map.update(id_map)
+        return final_configs, final_ids, final_paths
 
     def get_active_config():
         """
@@ -525,34 +936,44 @@ init 90 python in _fom_presence_config:
         evaluated to True.
 
         NOTE:
-            All errors will be reported using Error objects in global current
-            error context. Reported errors are not resolved on successful loads.
+            Condition evaluation problems are reported to status module and
+            cleared once the condition evaluates successfully again.
         """
 
-        for _file, conf in _configs:
-            if not conf.disable and conf.condition is not None:
+        for rel_file, conf in _configs:
+            if not conf.disable and conf.condition_code is not None:
                 try:
-                    if bool(eval(conf.condition, dict(), store.__dict__)):
-                        return conf
+                    result = bool(_eval_condition(conf.condition_code))
                 except Exception as e:
-                    _ERROR_CONFIG_LOADING.report(_file[len(_config_dir) + 1:], e)
+                    _report_config_problem(
+                        "condition", rel_file,
+                        util.format_text("Could not evaluate condition of config {0}, see log/submod_log.log.", rel_file),
+                        util.format_text("Could not evaluate condition of presence config {0}: {1}.", rel_file, e)
+                    )
+                    continue
+
+                status.clear(util.format_text("{0}condition:{1}", _STATUS_CONFIG_PREFIX, rel_file))
+                if result:
+                    return conf
 
         return None
 
     def get_config(_id):
         """
-        Fetches config by its ID (defined as ID= parameter in Presence section).
+        Fetches config by its ID (defined as ID= parameter in Presence section)
+        or by its path relative to config directory.
 
         IN:
             _id -> str:
-                ID of the config to fetch reference to.
+                ID or path of the config to fetch reference to.
 
         OUT:
             Config:
-                If config with such ID exists and was successfully loaded.
+                If config with such ID or path exists and was successfully
+                loaded.
 
             None:
-                If config with such ID does not exist.
+                If config with such ID or path does not exist.
         """
 
-        return _config_id_map.get(_id)
+        return _lookup(_id, _config_id_map, _config_path_map)

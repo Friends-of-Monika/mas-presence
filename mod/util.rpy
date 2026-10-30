@@ -1,25 +1,65 @@
-# util.rpy contains miscellaneous utility functions and classes that can be
-# reused in the rest of the Discord Presence Submod codebase.
-#
 # This file is part of Discord Presence Submod (see link below):
-# https://github.com/friends-of-monika/discord-presence-submod
-
+# https://github.com/friends-of-monika/mas-presence
 
 init 10 python in _fom_presence_util:
-
     import store
-
     from store import mas_calendar
     from store import mas_getEV
 
-
 init -1000 python in _fom_presence_util:
-
     import os
     import datetime
     import io
     import sys
 
+    try:
+        _text_type = unicode
+    except NameError:
+        _text_type = str
+
+    def to_text(value):
+        """
+        Converts value (e.g. exception, path or ID) to text without failing on
+        non-ASCII characters, whether value is a byte or text string.
+
+        IN:
+            value -> any:
+                Value to convert.
+
+        OUT:
+            unicode (str on Python 3):
+                Text representation of value.
+        """
+
+        if isinstance(value, _text_type):
+            return value
+        if isinstance(value, bytes):
+            return value.decode("utf-8", "replace")
+        try:
+            return _text_type(value)
+        except UnicodeError:
+            # Python 2 exceptions with non-ASCII byte string messages.
+            return str(value).decode("utf-8", "replace")
+
+    def format_text(template, *args):
+        """
+        Formats message (e.g. for log or status) with positional arguments
+        converted to text first, so that mixing byte and text strings with
+        non-ASCII characters does not fail on Python 2.
+
+        IN:
+            template -> str:
+                Format string with {0}, {1}, ... placeholders.
+
+            *args:
+                Values to substitute, converted with to_text.
+
+        OUT:
+            unicode (str on Python 3):
+                Formatted message.
+        """
+
+        return to_text(template).format(*[to_text(arg) for arg in args])
 
     def get_script_file(fallback=None, relative=False):
         """
@@ -113,7 +153,6 @@ init -1000 python in _fom_presence_util:
                 # Simply remove leading "game" item frm path parts.
                 parts.pop(0)
             return "/".join(parts)
-
 
     class Supplier(object):
         """
