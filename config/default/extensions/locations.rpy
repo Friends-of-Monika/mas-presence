@@ -10,11 +10,13 @@
 init 200 python in fom_presence_extensions:
 
     import store
-    from store import persistent, mas_background
 
 
     def _fom_loc_prompt():
-        bg = mas_background.BACKGROUND_MAP[persistent._mas_current_background]
+        # Current background is None until MAS sets it on startup.
+        bg = store.mas_current_background
+        if bg is None:
+            return None
         return renpy.substitute(bg.prompt)
 
     cvars_add_var("loc_prompt", _fom_loc_prompt)
