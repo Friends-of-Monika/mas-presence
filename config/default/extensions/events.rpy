@@ -27,10 +27,15 @@ init 200 python in fom_presence_extensions:
     events_ignore("milestone_personal_best")
 
 
-    def _fom_update_eve_vars(n_days, suffix):
+    def _fom_update_eve_vars(events, n_days, suffix):
         _vars = dict()
 
-        next_eve = _fom_get_next_event(n_days)
+        # Events are sorted by days until event, so first one in range is the
+        # closest one.
+        next_eve = None
+        if len(events) > 0 and events[0][0].days < n_days:
+            next_eve = events[0]
+
         if next_eve is None:
             _vars["eve_days_{0}".format(suffix)] = None
             _vars["eve_prompt_{0}".format(suffix)] = None
@@ -53,12 +58,16 @@ init 200 python in fom_presence_extensions:
             return "day"
 
     def _fom_update_eve_vars_all():
+        # Calendar is scanned once for the longest range, shorter ranges
+        # just take the closest event if it falls within them.
+        events = _fom_get_upcoming_events(365)
+
         _vars = dict()
-        _vars.update(_fom_update_eve_vars(1, "24h"))
-        _vars.update(_fom_update_eve_vars(3, "3d"))
-        _vars.update(_fom_update_eve_vars(7, "1w"))
-        _vars.update(_fom_update_eve_vars(31, "1m"))
-        _vars.update(_fom_update_eve_vars(365, "1y"))
+        _vars.update(_fom_update_eve_vars(events, 1, "24h"))
+        _vars.update(_fom_update_eve_vars(events, 3, "3d"))
+        _vars.update(_fom_update_eve_vars(events, 7, "1w"))
+        _vars.update(_fom_update_eve_vars(events, 31, "1m"))
+        _vars.update(_fom_update_eve_vars(events, 365, "1y"))
         return _vars
 
     cvars_add_var_set(_fom_update_eve_vars_all)

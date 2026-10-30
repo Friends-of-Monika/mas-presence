@@ -12,11 +12,9 @@ init 200 python in fom_presence_extensions:
     import store
 
     from store import MASEventList
-    from store.evhand import EventListItem
-    from store import _fom_presence
 
     @store.mas_submod_utils.functionplugin("ch30_preloop", priority=20)
-    def _fom_ch30_loop():
+    def _fom_ch30_preloop():
         _cvars_export_var("event_label", None)
 
     @store.mas_submod_utils.functionplugin("call_next_event", priority=20)
@@ -25,7 +23,7 @@ init 200 python in fom_presence_extensions:
         if item is None:
             value = None
         else:
-            value = item._eli[EventListItem.IDX_EVENT_LABEL]
+            value = item.evl
         _cvars_export_var("event_label", value)
 
     @store.mas_submod_utils.functionplugin("ch30_loop", priority=20)
